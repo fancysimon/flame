@@ -1,0 +1,4 @@
+#!/bin/bash
+
+flame_dir=/data/xiongchao.xc/code/flame
+python2.6 $flame_dir/flame.py "$@"

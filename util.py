@@ -1,5 +1,6 @@
 import os
 import sys
+import multiprocessing
 
 # Global color enabled or not
 _color_enabled = (sys.stdout.isatty() and
@@ -84,3 +85,5 @@ def GetBuildRootDir():
     flame_root = GetFlameRootDir()
     return os.path.join(flame_root, 'flame-bin')
 
+def GetCpuCount():
+    return multiprocessing.cpu_count()

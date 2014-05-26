@@ -101,6 +101,8 @@ class Target(object):
             # Only build |library_name|
             sys.argv = [library_name]
             execfile(build_name)
+            # Clear build targets.
+            sys.argv = []
             os.chdir(current_dir)
 
 def InitSconsRule():

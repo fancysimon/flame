@@ -10,18 +10,26 @@ import sys
 from target import *
 from util import *
 
+_option_args = None
+
 def ParseOption():
+    global _option_args
     parser = argparse.ArgumentParser()
-    parser.add_argument("cmd", default='build', help="Build command: build test run clean")
-    args = parser.parse_args(sys.argv[1:])
-    return args
+    parser.add_argument("cmd", default='build',
+                        help="Build command: build test run clean.")
+    parser.add_argument("-j", "--jobs", type=int, dest='jobs',
+                        default=0, help="Number of jobs to run simultaneously.")
+    _option_args = parser.parse_args(sys.argv[1:])
+    return parser
 
 def Main():
-    args = ParseOption()
-    if args.cmd not in ['build', 'test', 'run', 'clean']:
+    global _option_args
+    parser = ParseOption()
+    if _option_args.cmd not in ['build', 'test', 'run', 'clean']:
+        parser.print_help()
         ErrorExit('cmd is invalid.')
     cmd_dict = {'build':Build, 'test':Test, 'run':Run, 'clean':Clean}
-    cmd = cmd_dict[args.cmd]
+    cmd = cmd_dict[_option_args.cmd]
     cmd()
 
 def Build():
@@ -103,13 +111,17 @@ def GenerateSconsRule(cmd):
     scons_file.close()
 
 def RunScons(clean=False):
+    global _option_args
     current_dir = GetCurrentDir()
     blame_root_dir = GetFlameRootDir()
     os.chdir(blame_root_dir)
-    if not clean:
-        ret_code = subprocess.call(['scons'])
-    else:
-        ret_code = subprocess.call(['scons', '-c'])
+    cmd_list = ['scons']
+    if clean:
+        cmd_list.append('-c')
+    SelectJobs()
+    if _option_args.jobs > 1:
+        cmd_list.append('-j %d' % _option_args.jobs)
+    ret_code = subprocess.call(cmd_list)
     os.chdir(current_dir)
     if ret_code != 0:
         ErrorExit('There are some errors!')
@@ -117,6 +129,16 @@ def RunScons(clean=False):
 def Check():
     if GetFlameRootDir() == '':
         ErrorExit('FLAME_ROOT not find!')
+
+def SelectJobs():
+    global _option_args
+    if _option_args.jobs <= 0:
+        jobs = GetCpuCount()
+        if jobs <= 4:
+            jobs *= 2
+        elif jobs > 8:
+            jobs = 8
+        _option_args.jobs = jobs
 
 if __name__ == '__main__':
     Main()
