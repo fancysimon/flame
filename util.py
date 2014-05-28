@@ -87,3 +87,10 @@ def GetBuildRootDir():
 
 def GetCpuCount():
     return multiprocessing.cpu_count()
+
+def RemoveDuplicate(item_list):
+    result_list = []
+    for item in item_list:
+        if item not in result_list:
+            result_list.append(item)
+    return result_list

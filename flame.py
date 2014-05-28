@@ -65,31 +65,30 @@ def Clean():
 def BuildImpl():
     Check()
     LoadBuildFile()
-    GenerateSconsRule('build')
+    GenerateSconsRules('build')
     RunScons()
     return True
 
 def TestImpl():
     LoadBuildFile()
-    GenerateSconsRule('test')
+    GenerateSconsRules('test')
     RunScons()
     return True
 
 def RunImpl():
     LoadBuildFile()
-    GenerateSconsRule('run')
+    GenerateSconsRules('run')
     RunScons()
     return True
 
 def CleanImpl():
     Check()
     LoadBuildFile()
-    GenerateSconsRule('build')
+    GenerateSconsRules('build')
     RunScons(True)
     return True
 
 def LoadBuildFile():
-    InitSconsRule()
     build_name = GetBuildName()
     if not os.path.isfile(build_name):
         ErrorExit('BUILD not find.')
@@ -98,9 +97,9 @@ def LoadBuildFile():
     sys.argv = []
     execfile(build_name)
 
-def GenerateSconsRule(cmd):
+def GenerateSconsRules(cmd):
     WriteRuleForAllTargets()
-    scons_rules = GetSconsRule(cmd)
+    scons_rules = GetSconsRules(cmd)
     if len(scons_rules) == 0:
         ErrorExit('No targets to build.')
     flame_root_dir = GetFlameRootDir()
@@ -139,6 +138,20 @@ def SelectJobs():
         elif jobs > 8:
             jobs = 8
         _option_args.jobs = jobs
+
+def GetSconsRules(cmd):
+    target_types = []
+    if cmd == 'build' or cmd == 'run':
+        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin']
+    elif cmd == 'test':
+        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin', 'cc_test']
+    targets = GetAllTargets()
+    scons_rules = []
+    scons_rules.append('env = Environment(CPPPATH=[\"%s\"])\n' % (GetFlameRootDir()))
+    for target in targets:
+        if target.type in target_types:
+            scons_rules += target.scons_rules
+    return scons_rules
 
 if __name__ == '__main__':
     Main()

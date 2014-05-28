@@ -7,50 +7,117 @@ import copy
 from util import *
 
 _target_pool = {}
-_scons_rules = {}
+_sorted_target_node_list = []
 
 class Target(object):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs):
         self.name = name
         self.type = target_type
         self.srcs = srcs
+        if isinstance(self.srcs, str):
+            self.srcs = [self.srcs]
         self.deps = deps
+        if isinstance(self.deps, str):
+            self.deps = [self.deps]
+        self.incs = incs
+        if isinstance(self.incs, str):
+            self.incs = [self.incs]
         self.scons_target_type = scons_target_type
         self.current_dir = GetCurrentDir()
         self.build_root_dir = GetBuildRootDir()
         self.relative_dir = GetRelativeDir(self.current_dir, GetFlameRootDir())
         self.flame_root_dir = GetFlameRootDir()
         self.key = os.path.join(self.current_dir, self.name)
+        self.system_library_list = []
         self.dep_library_list = []
         self.dep_paths = []
+        self.dep_header_list = []
         self.recursive_library_list = []
+        self.scons_rules = []
+        self.relative_name = os.path.join(self.relative_dir, self.name)
+        self.relative_name = self.RemoveSpecialChar(self.relative_name)
+        self.prebuilt = prebuilt
+        self.target_name = self.relative_name
 
     def WriteRule(self):
+        env = self.relative_name + '_env'
+        env = self.RemoveSpecialChar(env)
+        rule = '%s = env.Clone()\n' % (env)
+        self.AddRule(rule)
+        # Include path.
+        if len(self.dep_header_list) > 0:
+            rule = '%s.Append(CPPPATH=%s)\n' % (env, self.dep_header_list)
+            self.AddRule(rule)
+        # Prebuild library
+        if self.prebuilt == 1:
+            rule = 'Command("build64_release/AliWS/libAliWS.a", "AliWS/lib64_release/libAliWS.a", Copy("$TARGET", "$SOURCE"))\n'
+            prebuilt_name = 'lib%s.a' % (self.name)
+            prebuilt_target = os.path.join(self.build_root_dir, self.relative_dir, prebuilt_name)
+            prebuilt_source = os.path.join(self.flame_root_dir, self.relative_dir, 'lib', prebuilt_name)
+            rule = 'Command(\"%s\", \"%s\", Copy(\"$TARGET\", \"$SOURCE\"))\n' % (prebuilt_target, prebuilt_source)
+            self.AddRule(rule)
+            rule = '%s = env.File(\"%s\")\n' % (self.relative_name, prebuilt_target)
+            self.AddRule(rule)
+            return
+        # Not prebuilt.
         srcs = []
         for src in self.srcs:
             src_with_path = os.path.join(self.current_dir, src)
             srcs.append(src_with_path)
-        name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
-        deps = self.dep_library_list
-        env = self.type + '_env'
-        rule = '%s = env.Clone()\n' % (env)
+        full_name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
+        objs = []
+        for src_with_path in srcs:
+            src = os.path.basename(src_with_path)
+            obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
+                    self.name + '.objs', src + '.o')
+            obj = self.relative_dir + "_" + src + '_obj'
+            obj = self.RemoveSpecialChar(obj)
+            rule = '%s = %s.SharedObject(target = \"%s\", source = \"%s\")\n' % (
+                    obj, env, obj_target_name, src_with_path)
+            objs.append(obj)
+            self.AddRule(rule)
+        objs_name = self.relative_dir + '_' + self.name + '_objs'
+        objs_name = self.RemoveSpecialChar(objs_name)
+        rule = '%s = [%s]\n' % (objs_name, ','.join(objs))
         self.AddRule(rule)
-        rule = '%s = %s.%s(\"%s\", %s, LIBS=%s, LIBPATH=%s)\n' % (
-                self.name, env, self.scons_target_type,
-                name, srcs, deps, self.dep_paths)
+        #deps = self.dep_library_list
+        deps = self.FormatDepLibrary()
+        rule = '%s = %s.%s(\"%s\", %s, LIBS=%s)\n' % (
+                self.target_name, env, self.scons_target_type,
+                full_name, objs_name, deps)
+        #rule = '%s = %s.%s(\"%s\", %s, LIBS=%s, LIBPATH=%s)\n' % (
+        #        self.target_name, env, self.scons_target_type,
+        #        full_name, objs_name, deps, self.dep_paths)
+        #rule = '%s = %s.%s(\"%s\", %s, LIBS=%s, LIBPATH=%s)\n' % (
+        #        self.name, env, self.scons_target_type,
+        #        full_name, srcs, deps, self.dep_paths)
         self.AddRule(rule)
 
+    def RemoveSpecialChar(self, name):
+        name = name.replace('/', '_')
+        name = name.replace('-', '_')
+        name = name.replace('.', '_')
+        name = name.replace(':', '_')
+        return name
+
+    def FormatDepLibrary(self):
+        res = '['
+        for library in self.dep_library_list:
+            res += library + ','
+        for library in self.system_library_list:
+            res += '\"' + library + '\",'
+        res += ']'
+        return res
+
     def AddRule(self, rule):
-        global _scons_rules
-        if self.type not in _scons_rules:
-            _scons_rules[self.type] = []
-        if rule in _scons_rules[self.type]:
-            return
-        _scons_rules[self.type].append(rule)
+        self.scons_rules.append(rule)
 
     def ParseAndAddTarget(self):
         self.ParseDeps()
         self.ParseDepsRecursive()
+        self.AddToTargetPool()
+
+    def AddPrebuiltTarget(self):
         self.AddToTargetPool()
 
     def AddToTargetPool(self):
@@ -61,13 +128,16 @@ class Target(object):
     def ParseDeps(self):
         self.dep_library_list = []
         self.dep_paths = []
+        self.dep_header_list = []
         for dep in self.deps:
             if len(dep) == 0:
                 continue
             if dep[0] == '#':
-                self.dep_library_list.append(dep[1:])
+                self.system_library_list.append(dep[1:])
             elif dep[0] == ':':
-                self.dep_library_list.append(dep[1:])
+                dep_library = os.path.join(self.relative_dir, dep[1:])
+                dep_library = self.RemoveSpecialChar(dep_library)
+                self.dep_library_list.append(dep_library)
                 target_key = os.path.join(self.current_dir, dep[1:])
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, self.relative_dir)
@@ -78,13 +148,19 @@ class Target(object):
                     ErrorExit('The format of deps(%s) is invalid.' % (dep))
                 library_path = fields[0]
                 library_name = fields[1]
-                self.dep_library_list.append(library_name)
+                dep_library = self.RemoveSpecialChar(dep[2:])
+                self.dep_library_list.append(dep_library)
                 target_key = os.path.join(self.flame_root_dir, library_path, library_name)
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, library_path)
                 self.dep_paths.append(dep_path)
             else:
                 ErrorExit('The format of deps(%s) is invalid.' % (dep))
+        # Include path.
+        if len(self.incs) > 0:
+            for inc in self.incs:
+                inc_with_path = os.path.join(self.current_dir, inc)
+                self.dep_header_list.append(inc_with_path)
 
     def ParseDepsRecursive(self):
         global _target_pool
@@ -105,29 +181,23 @@ class Target(object):
             sys.argv = []
             os.chdir(current_dir)
 
-def InitSconsRule():
-    global _scons_rules
-    _scons_rules = {}
-    _scons_rules['env'] = ['env = Environment(CPPPATH=[\"%s\"])\n' % (GetFlameRootDir())]
-
-def GetSconsRule(cmd):
-    global _scons_rules
-    target_types = []
-    if cmd == 'build' or cmd == 'run':
-        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin']
-    elif cmd == 'test':
-        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin', 'cc_test']
-    rule_list = []
-    for target_type in target_types:
-        if target_type in _scons_rules:
-            rule_list += _scons_rules[target_type]
-    return rule_list
-
 def WriteRuleForAllTargets():
     global _target_pool
-    ComplementSubDeps()
-    for key, target in _target_pool.items():
+    global _sorted_target_node_list
+    _sorted_target_node_list = TopologySort()
+    ComplementSubDeps(_sorted_target_node_list)
+    for node in _sorted_target_node_list:
+        target = _target_pool[node.key]
         target.WriteRule()
+
+def GetAllTargets():
+    global _target_pool
+    global _sorted_target_node_list
+    targets = []
+    for node in _sorted_target_node_list:
+        target = _target_pool[node.key]
+        targets.append(target)
+    return targets
 
 class TargetNode:
     def __init__(self, key, recursive_library_list):
@@ -153,32 +223,44 @@ def TopologySort():
         result_list += zero_degree_list
     return result_list
 
-def ComplementSubDeps():
+def ComplementSubDeps(sorted_target_node_list):
     global _target_pool
-    target_node_list = TopologySort()
-    for node in target_node_list:
+    for node in sorted_target_node_list:
         target = _target_pool[node.key]
         for key in target.recursive_library_list:
             sub_target = _target_pool[key]
+            # Dependant sub library must be put after this library,
+            # or there will be link error(undefined reference to).
             target.dep_library_list += sub_target.dep_library_list
+            target.system_library_list += sub_target.system_library_list
             target.dep_paths += sub_target.dep_paths
-        target.dep_library_list = list(set(target.dep_library_list))
-        target.dep_paths = list(set(target.dep_paths))
+            target.dep_header_list += sub_target.dep_header_list
+        target.dep_library_list = RemoveDuplicate(target.dep_library_list)
+        target.system_library_list = RemoveDuplicate(target.system_library_list)
+        target.dep_paths = RemoveDuplicate(target.dep_paths)
+        target.dep_header_list = RemoveDuplicate(target.dep_header_list)
 
 class CcTarget(Target):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type):
-        Target.__init__(self, name, target_type, srcs, deps, scons_target_type)
+    def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs):
+        Target.__init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs)
         # build targets are send by sys.argv
         build_target_list = sys.argv
         if len(build_target_list) == 0 or name in build_target_list:
-            self.ParseAndAddTarget()
+            if self.prebuilt == 0:
+                self.ParseAndAddTarget()
+            elif self.prebuilt == 1:
+                self.AddPrebuiltTarget()
 
-def cc_library(name, srcs, deps=[]):
-    target = CcTarget(name, 'cc_library', srcs, deps, 'Library')
+# TODO: warning
+def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes'):
+    target = CcTarget(name, 'cc_library', srcs, deps, 'Library', prebuilt, incs)
 
-def cc_plugin(name, srcs, deps=[]):
-    target = CcTarget(name, 'cc_plugin', srcs, deps, 'SharedLibrary')
+def cc_plugin(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes'):
+    target = CcTarget(name, 'cc_plugin', srcs, deps, 'SharedLibrary', prebuilt, incs)
 
-def cc_binary(name, srcs, deps=[]):
-    target = CcTarget(name, 'cc_binary', srcs, deps, 'Program')
+def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
+    target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs)
+
+def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
+    target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs)
 
