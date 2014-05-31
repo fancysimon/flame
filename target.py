@@ -5,9 +5,7 @@
 import os
 import copy
 from util import *
-
-_target_pool = {}
-_sorted_target_node_list = []
+import target_pool
 
 class Target(object):
     def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs):
@@ -121,9 +119,9 @@ class Target(object):
         self.AddToTargetPool()
 
     def AddToTargetPool(self):
-        global _target_pool
-        if self.key not in _target_pool:
-            _target_pool[self.key] = self
+        targets = target_pool.GetTargetPool()
+        if self.key not in targets:
+            targets[self.key] = self
 
     def ParseDeps(self):
         self.dep_library_list = []
@@ -163,9 +161,9 @@ class Target(object):
                 self.dep_header_list.append(inc_with_path)
 
     def ParseDepsRecursive(self):
-        global _target_pool
+        targets = target_pool.GetTargetPool()
         for target_key in self.recursive_library_list:
-            if target_key in _target_pool:
+            if target_key in targets:
                 continue
             library_path = os.path.dirname(target_key)
             library_name = os.path.basename(target_key)
@@ -180,65 +178,6 @@ class Target(object):
             # Clear build targets.
             sys.argv = []
             os.chdir(current_dir)
-
-def WriteRuleForAllTargets():
-    global _target_pool
-    global _sorted_target_node_list
-    _sorted_target_node_list = TopologySort()
-    ComplementSubDeps(_sorted_target_node_list)
-    for node in _sorted_target_node_list:
-        target = _target_pool[node.key]
-        target.WriteRule()
-
-def GetAllTargets():
-    global _target_pool
-    global _sorted_target_node_list
-    targets = []
-    for node in _sorted_target_node_list:
-        target = _target_pool[node.key]
-        targets.append(target)
-    return targets
-
-class TargetNode:
-    def __init__(self, key, recursive_library_list):
-        self.key = key
-        self.recursive_library_list = copy.copy(recursive_library_list)
-
-def TopologySort():
-    global _target_pool
-    target_node_list = []
-    for key, target in _target_pool.items():
-        node = TargetNode(key, target.recursive_library_list)
-        target_node_list.append(node)
-    result_list = []
-    while True:
-        if len(target_node_list) == 0:
-            break
-        zero_degree_list = filter(lambda x:len(x.recursive_library_list)==0, target_node_list)
-        target_node_list = filter(lambda x:len(x.recursive_library_list)>0, target_node_list)
-        for node in zero_degree_list:
-            for node2 in target_node_list:
-                if node.key in node2.recursive_library_list:
-                    node2.recursive_library_list.remove(node.key)
-        result_list += zero_degree_list
-    return result_list
-
-def ComplementSubDeps(sorted_target_node_list):
-    global _target_pool
-    for node in sorted_target_node_list:
-        target = _target_pool[node.key]
-        for key in target.recursive_library_list:
-            sub_target = _target_pool[key]
-            # Dependant sub library must be put after this library,
-            # or there will be link error(undefined reference to).
-            target.dep_library_list += sub_target.dep_library_list
-            target.system_library_list += sub_target.system_library_list
-            target.dep_paths += sub_target.dep_paths
-            target.dep_header_list += sub_target.dep_header_list
-        target.dep_library_list = RemoveDuplicate(target.dep_library_list)
-        target.system_library_list = RemoveDuplicate(target.system_library_list)
-        target.dep_paths = RemoveDuplicate(target.dep_paths)
-        target.dep_header_list = RemoveDuplicate(target.dep_header_list)
 
 class CcTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs):

@@ -8,6 +8,7 @@ import parser
 import subprocess
 import sys
 from target import *
+from target_pool import *
 from util import *
 
 _option_args = None
