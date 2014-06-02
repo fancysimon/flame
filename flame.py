@@ -42,22 +42,10 @@ def Build():
         Info('Build success!')
 
 def Test():
-    if BuildImpl():
-        if not TestImpl():
-            Error('Run test cases failed!')
-        else:
-            Info('Run test cases success!')
-    else:
-        Error('Build failed!')
+    TestImpl()
 
 def Run():
-    if BuildImpl():
-        if not RunImpl():
-            Error('Run failed!')
-        else:
-            Info('Run success!')
-    else:
-        Error('Build failed!')
+    RunImpl()
 
 def Clean():
     if CleanImpl():
@@ -73,12 +61,15 @@ def BuildImpl():
     return True
 
 def TestImpl():
+    Check()
     LoadBuildFile()
     GenerateSconsRules('test')
     RunScons()
+    RunTestCases()
     return True
 
 def RunImpl():
+    Check()
     LoadBuildFile()
     GenerateSconsRules('run')
     RunScons()
@@ -91,6 +82,22 @@ def CleanImpl():
     RunScons(True)
     return True
 
+def RunTestCases():
+    targets = GetAllTargets()
+    test_case_num = 0
+    success_test_case_num = 0
+    for target in targets:
+        if target.type == 'cc_test':
+            ret = subprocess.call(target.test_case)
+            if ret == 0:
+                success_test_case_num += 1
+            test_case_num += 1
+    if test_case_num == success_test_case_num:
+        Info('All test cases passed!')
+    else:
+        Info('%d test cases passed!' % success_test_case_num)
+        Error('%d test cases failed!' % (test_case_num - success_test_case_num))
+
 def LoadBuildFile():
     global _option_args
     build_name = GetBuildName()
@@ -101,6 +108,8 @@ def LoadBuildFile():
     sys.argv = []
     if _option_args.dynamic == 1:
         sys.argv.append('-dynamic')
+    if _option_args.cmd == 'test':
+        sys.argv.append('-test')
     execfile(build_name)
 
 def GenerateSconsRules(cmd):
@@ -148,9 +157,9 @@ def SelectJobs():
 def GetSconsRules(cmd):
     target_types = []
     if cmd == 'build' or cmd == 'run':
-        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin']
+        target_types += ['env', 'cc_library', 'cc_binary']
     elif cmd == 'test':
-        target_types += ['env', 'cc_library', 'cc_binary', 'cc_plugin', 'cc_test']
+        target_types += ['env', 'cc_library', 'cc_binary', 'cc_test']
     targets = GetAllTargets()
     scons_rules = []
     scons_rules.append('env = Environment(CPPPATH=[\"%s\"])\n' % (GetFlameRootDir()))

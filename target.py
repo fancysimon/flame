@@ -100,6 +100,8 @@ class Target(object):
             rule = '%s = %s.%s(\"%s\", %s, LIBS=%s)\n' % (
                     self.target_name, env, self.scons_target_type,
                     full_name, objs_name, deps)
+        if self.type == 'cc_test':
+            self.test_case = full_name
         self.AddRule(rule)
 
     def RemoveSpecialChar(self, name):
@@ -164,8 +166,9 @@ class Target(object):
                 if len(fields) != 2:
                     ErrorExit('The format of deps(%s) is invalid.' % (dep))
                 library_path = fields[0]
+                library_path = library_path.rstrip('/')
                 library_name = fields[1]
-                dep_library = self.RemoveSpecialChar(dep[2:])
+                dep_library = self.RemoveSpecialChar(library_path + ':' + library_name)
                 if self.export_dynamic == 1:
                     self.dep_library_list.append(library_name)
                 else:
@@ -197,6 +200,7 @@ class Target(object):
             if not os.path.isfile(build_name):
                 ErrorExit('BUILD not find.')
             # Only build |library_name|
+            argv_backup = copy.copy(sys.argv)
             sys.argv = [library_name]
             if self.export_dynamic == 1:
                 if library_name[-6:] == '_share':
@@ -204,8 +208,8 @@ class Target(object):
                     sys.argv = [library_name]
                 sys.argv.append('-dynamic')
             execfile(build_name)
-            # Clear build targets.
-            sys.argv = []
+            # Clear build targets, restore old argv.
+            sys.argv = argv_backup
             os.chdir(current_dir)
 
 class CcTarget(Target):
@@ -232,5 +236,12 @@ def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dy
     target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, export_dynamic)
 
 def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
+    print 'cc_test name:', name
+    if '-test' not in sys.argv:
+        return
+    print 'cc_test after name:', name
+    if isinstance(deps, str):
+        deps = [deps]
+    deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
     target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs, export_dynamic)
 

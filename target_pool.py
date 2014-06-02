@@ -46,3 +46,4 @@ def ComplementSubDeps(sorted_target_node_list):
 def GetTargetPool():
     global _target_pool
     return _target_pool
+
