@@ -13,6 +13,12 @@ class TargetNode:
         self.key = key
         self.recursive_library_list = copy.copy(recursive_library_list)
 
+def ToString(target_node_list):
+    ans = ''
+    for target_node in target_node_list:
+        ans += '[key:' + target_node.key + ' lib:' + ','.join(target_node.recursive_library_list) + '] '
+    return ans
+
 def TopologySort(target_pool):
     target_node_list = []
     for key, target in target_pool.items():

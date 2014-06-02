@@ -20,6 +20,8 @@ def ParseOption():
                         help="Build command: build test run clean.")
     parser.add_argument("-j", "--jobs", type=int, dest='jobs',
                         default=0, help="Number of jobs to run simultaneously.")
+    parser.add_argument("-s", "--generate-dynamic", type=int, dest='dynamic',
+                        default=0, help="Generate dynamic library(so).")
     _option_args = parser.parse_args(sys.argv[1:])
     return parser
 
@@ -90,12 +92,15 @@ def CleanImpl():
     return True
 
 def LoadBuildFile():
+    global _option_args
     build_name = GetBuildName()
     if not os.path.isfile(build_name):
         ErrorExit('BUILD not find.')
     Info('Loading BUILDs...')
     # Clear targets to load send by sys.argv.
     sys.argv = []
+    if _option_args.dynamic == 1:
+        sys.argv.append('-dynamic')
     execfile(build_name)
 
 def GenerateSconsRules(cmd):
