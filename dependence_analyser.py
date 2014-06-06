@@ -22,7 +22,7 @@ def ToString(target_node_list):
 def TopologySort(target_pool):
     target_node_list = []
     for key, target in target_pool.items():
-        node = TargetNode(key, target.recursive_library_list)
+        node = TargetNode(key, target.recursive_library_list_for_sort)
         target_node_list.append(node)
     result_list = []
     while True:
@@ -30,6 +30,8 @@ def TopologySort(target_pool):
             break
         zero_degree_list = filter(lambda x:len(x.recursive_library_list)==0, target_node_list)
         target_node_list = filter(lambda x:len(x.recursive_library_list)>0, target_node_list)
+        #print 'zero_degree_list:', ToString(zero_degree_list)
+        #print 'target_node_list:', ToString(target_node_list)
         for node in zero_degree_list:
             for node2 in target_node_list:
                 if node.key in node2.recursive_library_list:

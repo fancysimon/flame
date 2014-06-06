@@ -28,10 +28,14 @@ class Target(object):
         self.flame_root_dir = GetFlameRootDir()
         self.key = os.path.join(self.current_dir, self.name)
         self.system_library_list = []
+        self.prebuilt_library_list = []
         self.dep_library_list = []
         self.dep_paths = []
         self.dep_header_list = []
         self.recursive_library_list = []
+        self.recursive_library_list_sort = []
+        self.objs = []
+        self.sub_objs = []
         self.scons_rules = []
         self.relative_name = os.path.join(self.relative_dir, self.name)
         self.relative_name = self.RemoveSpecialChar(self.relative_name)
@@ -75,7 +79,7 @@ class Target(object):
             src_with_path = os.path.join(self.current_dir, src)
             srcs.append(src_with_path)
         full_name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
-        objs = []
+        #self.objs = []
         for src_with_path in srcs:
             src = os.path.basename(src_with_path)
             obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
@@ -84,15 +88,21 @@ class Target(object):
             obj = self.RemoveSpecialChar(obj)
             rule = '%s = %s.SharedObject(target = \"%s\", source = \"%s\")\n' % (
                     obj, env, obj_target_name, src_with_path)
-            objs.append(obj)
+            #self.objs.append(obj)
             self.AddRule(rule)
         objs_name = self.relative_dir + '_' + self.name + '_objs' + dl_suffix
         objs_name = self.RemoveSpecialChar(objs_name)
-        rule = '%s = [%s]\n' % (objs_name, ','.join(objs))
+        if is_dynamic == 1:
+            rule = '%s = [%s]\n' % (objs_name, ','.join(self.objs + self.sub_objs))
+        else:
+            rule = '%s = [%s]\n' % (objs_name, ','.join(self.objs))
         self.AddRule(rule)
         deps = self.FormatDepLibrary()
         if is_dynamic == 1:
             # Dynamic dependence library can not link with absolutive path.
+            #rule = '%s = %s.%s(\"%s\", %s, LIBS=%s, LIBPATH=%s)\n' % (
+            #        self.target_name, env, self.scons_target_type,
+            #        full_name, objs_name, deps, self.dep_paths)
             rule = '%s = %s.%s(\"%s\", %s, LIBS=%s, LIBPATH=%s)\n' % (
                     self.target_name, env, self.scons_target_type,
                     full_name, objs_name, deps, self.dep_paths)
@@ -113,13 +123,15 @@ class Target(object):
 
     def FormatDepLibrary(self):
         res = '['
-        for library in self.dep_library_list:
-            # Dynamic dependence library can not link with absolutive path.
-            if self.export_dynamic == 1:
+        if self.export_dynamic == 1:
+            for library in self.prebuilt_library_list:
                 library = '\"%s\"' % library
-            res += library + ','
+                res += library + ','
+        else:
+            for library in self.dep_library_list:
+                res += library + ','
         for library in self.system_library_list:
-            res += '\"' + library + '\",'
+            res += '\"%s\",' % library
         res += ']'
         return res
 
@@ -127,6 +139,7 @@ class Target(object):
         self.scons_rules.append(rule)
 
     def ParseAndAddTarget(self):
+        self.AddObjs()
         self.ParseDeps()
         self.ParseDepsRecursive()
         self.AddToTargetPool()
@@ -138,6 +151,27 @@ class Target(object):
         targets = target_pool.GetTargetPool()
         if self.key not in targets:
             targets[self.key] = self
+
+    def AddObjs(self):
+        srcs = []
+        for src in self.srcs:
+            src_with_path = os.path.join(self.current_dir, src)
+            srcs.append(src_with_path)
+        #full_name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
+        self.objs = []
+        for src_with_path in srcs:
+            src = os.path.basename(src_with_path)
+            #obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
+            #        self.name + '.objs' + dl_suffix, src + '.o')
+            obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
+                    self.name + '.objs', src + '.o')
+            #obj = self.relative_dir + "_" + src + '_obj' + dl_suffix
+            obj = self.relative_dir + "_" + src + '_obj'
+            obj = self.RemoveSpecialChar(obj)
+            #rule = '%s = %s.SharedObject(target = \"%s\", source = \"%s\")\n' % (
+            #        obj, env, obj_target_name, src_with_path)
+            self.objs.append(obj)
+            #self.AddRule(rule)
 
     def ParseDeps(self):
         self.dep_library_list = []
@@ -156,8 +190,8 @@ class Target(object):
                 else:
                     self.dep_library_list.append(dep_library)
                 target_key = os.path.join(self.current_dir, dep[1:])
-                if self.export_dynamic == 1:
-                    target_key += self.dl_suffix
+                #if self.export_dynamic == 1:
+                #    target_key += self.dl_suffix
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, self.relative_dir)
                 self.dep_paths.append(dep_path)
@@ -174,8 +208,8 @@ class Target(object):
                 else:
                     self.dep_library_list.append(dep_library)
                 target_key = os.path.join(self.flame_root_dir, library_path, library_name)
-                if self.export_dynamic == 1:
-                    target_key += self.dl_suffix
+                #if self.export_dynamic == 1:
+                #    target_key += self.dl_suffix
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, library_path)
                 self.dep_paths.append(dep_path)
@@ -206,7 +240,6 @@ class Target(object):
                 if library_name[-6:] == '_share':
                     library_name = library_name[:len(library_name)-6]
                     sys.argv = [library_name]
-                sys.argv.append('-dynamic')
             execfile(build_name)
             # Clear build targets, restore old argv.
             sys.argv = argv_backup
@@ -226,8 +259,6 @@ class CcTarget(Target):
 
 # TODO: warning
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
-    if '-dynamic' in sys.argv:
-        export_dynamic = 1
     if export_dynamic == 1:
         target = CcTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', prebuilt, incs, export_dynamic)
     target = CcTarget(name, 'cc_library', srcs, deps, 'Library', prebuilt, incs, 0)
@@ -236,10 +267,8 @@ def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dy
     target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, export_dynamic)
 
 def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
-    print 'cc_test name:', name
     if '-test' not in sys.argv:
         return
-    print 'cc_test after name:', name
     if isinstance(deps, str):
         deps = [deps]
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']

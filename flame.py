@@ -20,8 +20,6 @@ def ParseOption():
                         help="Build command: build test run clean.")
     parser.add_argument("-j", "--jobs", type=int, dest='jobs',
                         default=0, help="Number of jobs to run simultaneously.")
-    parser.add_argument("-s", "--generate-dynamic", type=int, dest='dynamic',
-                        default=0, help="Generate dynamic library(so).")
     _option_args = parser.parse_args(sys.argv[1:])
     return parser
 
@@ -106,8 +104,6 @@ def LoadBuildFile():
     Info('Loading BUILDs...')
     # Clear targets to load send by sys.argv.
     sys.argv = []
-    if _option_args.dynamic == 1:
-        sys.argv.append('-dynamic')
     if _option_args.cmd == 'test':
         sys.argv.append('-test')
     execfile(build_name)
