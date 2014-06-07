@@ -30,8 +30,8 @@ def TopologySort(target_pool):
             break
         zero_degree_list = filter(lambda x:len(x.recursive_library_list)==0, target_node_list)
         target_node_list = filter(lambda x:len(x.recursive_library_list)>0, target_node_list)
-        #print 'zero_degree_list:', ToString(zero_degree_list)
-        #print 'target_node_list:', ToString(target_node_list)
+        if len(zero_degree_list) == 0:
+            ErrorExit('Library dependency has circle!')
         for node in zero_degree_list:
             for node2 in target_node_list:
                 if node.key in node2.recursive_library_list:

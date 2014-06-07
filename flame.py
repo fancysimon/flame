@@ -20,6 +20,7 @@ def ParseOption():
                         help="Build command: build test run clean.")
     parser.add_argument("-j", "--jobs", type=int, dest='jobs',
                         default=0, help="Number of jobs to run simultaneously.")
+    parser.add_argument('args', nargs=argparse.REMAINDER)
     _option_args = parser.parse_args(sys.argv[1:])
     return parser
 
@@ -53,14 +54,14 @@ def Clean():
 
 def BuildImpl():
     Check()
-    LoadBuildFile()
+    LoadBuildFiles()
     GenerateSconsRules('build')
     RunScons()
     return True
 
 def TestImpl():
     Check()
-    LoadBuildFile()
+    LoadBuildFiles()
     GenerateSconsRules('test')
     RunScons()
     RunTestCases()
@@ -68,14 +69,14 @@ def TestImpl():
 
 def RunImpl():
     Check()
-    LoadBuildFile()
+    LoadBuildFiles()
     GenerateSconsRules('run')
     RunScons()
     return True
 
 def CleanImpl():
     Check()
-    LoadBuildFile()
+    LoadBuildFiles()
     GenerateSconsRules('build')
     RunScons(True)
     return True
@@ -96,17 +97,53 @@ def RunTestCases():
         Info('%d test cases passed!' % success_test_case_num)
         Error('%d test cases failed!' % (test_case_num - success_test_case_num))
 
-def LoadBuildFile():
+def LoadBuildFile(target=None):
     global _option_args
     build_name = GetBuildName()
     if not os.path.isfile(build_name):
         ErrorExit('BUILD not find.')
-    Info('Loading BUILDs...')
     # Clear targets to load send by sys.argv.
     sys.argv = []
+    if target != None:
+        sys.argv = [target]
     if _option_args.cmd == 'test':
         sys.argv.append('-test')
     execfile(build_name)
+
+def LoadBuildFiles():
+    global _option_args
+    Info('Loading BUILDs...')
+    if len(_option_args.args) == 0:
+        LoadBuildFile()
+    else:
+        arg = _option_args.args[0]
+        current_dir = GetCurrentDir()
+        if arg == '...':
+            for target_dir, _, _ in os.walk(current_dir):
+                os.chdir(target_dir)
+                build_name = GetBuildName()
+                if not os.path.isfile(build_name):
+                    continue
+                LoadBuildFile()
+            os.chdir(current_dir)
+        else:
+            fields = arg.split(':')
+            if len(fields) == 1:
+                target_dir = os.path.join(current_dir, arg)
+                if not os.path.isdir(target_dir):
+                    ErrorExit('Dir is not exists: %s' % target_dir)
+                os.chdir(target_dir)
+                LoadBuildFile()
+                os.chdir(current_dir)
+            elif len(fields) == 2:
+                target_dir = os.path.join(current_dir, fields[0])
+                if not os.path.isdir(target_dir):
+                    ErrorExit('Dir is not exists: %s' % target_dir)
+                os.chdir(target_dir)
+                LoadBuildFile(fields[1])
+                os.chdir(current_dir)
+            else:
+                ErrorExit('Target format is invalid.')
 
 def GenerateSconsRules(cmd):
     WriteRuleForAllTargets()
@@ -149,6 +186,7 @@ def SelectJobs():
         elif jobs > 8:
             jobs = 8
         _option_args.jobs = jobs
+    Info('Jobs number is %d.' % _option_args.jobs)
 
 def GetSconsRules(cmd):
     target_types = []

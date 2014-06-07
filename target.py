@@ -5,6 +5,7 @@
 import os
 import copy
 from util import *
+import glob
 import target_pool
 
 class Target(object):
@@ -14,6 +15,7 @@ class Target(object):
         self.srcs = srcs
         if isinstance(self.srcs, str):
             self.srcs = [self.srcs]
+        self.SrcReplaceRegex()
         self.deps = deps
         if isinstance(self.deps, str):
             self.deps = [self.deps]
@@ -240,6 +242,11 @@ class Target(object):
             build_name = GetBuildName()
             if not os.path.isfile(build_name):
                 ErrorExit('BUILD not find.')
+            build_library_pool = target_pool.GetBuildLibraryPool()
+            if (build_name, library_name) in build_library_pool:
+                os.chdir(current_dir)
+                continue
+            build_library_pool[(build_name, library_name)] = 1
             # Only build |library_name|
             argv_backup = copy.copy(sys.argv)
             sys.argv = [library_name]
@@ -251,6 +258,16 @@ class Target(object):
             # Clear build targets, restore old argv.
             sys.argv = argv_backup
             os.chdir(current_dir)
+
+    def SrcReplaceRegex(self):
+        new_srcs = []
+        for src in self.srcs:
+            if '*' in src:
+                src_list = glob.glob(src)
+                new_srcs += src_list
+            else:
+                new_srcs.append(src)
+        self.srcs = new_srcs
 
 class CcTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs, export_dynamic):
@@ -269,17 +286,17 @@ def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', expor
     if prebuilt == 1:
         export_dynamic = 1
     if export_dynamic == 1:
-        target = CcTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', prebuilt, incs, export_dynamic)
+        target = CcTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', prebuilt, incs, 1)
     target = CcTarget(name, 'cc_library', srcs, deps, 'Library', prebuilt, incs, 0)
 
-def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
-    target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, export_dynamic)
+def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
+    target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, 0)
 
-def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
+def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
     if '-test' not in sys.argv:
         return
     if isinstance(deps, str):
         deps = [deps]
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
-    target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs, export_dynamic)
+    target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs, 0)
 

@@ -8,6 +8,7 @@ from util import *
 from dependence_analyser import *
 
 _target_pool = {}
+_build_library_pool = {}
 
 def WriteRuleForAllTargets():
     global _target_pool
@@ -71,4 +72,9 @@ def GenerateRecursiveForSort():
 def GetTargetPool():
     global _target_pool
     return _target_pool
+
+def GetBuildLibraryPool():
+    global _build_library_pool
+    return _build_library_pool
+
 
