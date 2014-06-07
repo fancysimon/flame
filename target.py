@@ -141,10 +141,12 @@ class Target(object):
     def ParseAndAddTarget(self):
         self.AddObjs()
         self.ParseDeps()
+        self.ParseDepHeader()
         self.ParseDepsRecursive()
         self.AddToTargetPool()
 
     def AddPrebuiltTarget(self):
+        self.ParseDepHeader()
         self.AddToTargetPool()
 
     def AddToTargetPool(self):
@@ -158,15 +160,18 @@ class Target(object):
             src_with_path = os.path.join(self.current_dir, src)
             srcs.append(src_with_path)
         #full_name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
+        dl_suffix = ''
+        if self.export_dynamic == 1:
+            dl_suffix = self.dl_suffix
         self.objs = []
         for src_with_path in srcs:
             src = os.path.basename(src_with_path)
-            #obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
-            #        self.name + '.objs' + dl_suffix, src + '.o')
             obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
-                    self.name + '.objs', src + '.o')
-            #obj = self.relative_dir + "_" + src + '_obj' + dl_suffix
-            obj = self.relative_dir + "_" + src + '_obj'
+                    self.name + '.objs' + dl_suffix, src + '.o')
+            #obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
+            #        self.name + '.objs', src + '.o')
+            obj = self.relative_dir + "_" + src + '_obj' + dl_suffix
+            #obj = self.relative_dir + "_" + src + '_obj'
             obj = self.RemoveSpecialChar(obj)
             #rule = '%s = %s.SharedObject(target = \"%s\", source = \"%s\")\n' % (
             #        obj, env, obj_target_name, src_with_path)
@@ -215,6 +220,8 @@ class Target(object):
                 self.dep_paths.append(dep_path)
             else:
                 ErrorExit('The format of deps(%s) is invalid.' % (dep))
+
+    def ParseDepHeader(self):
         # Include path.
         if len(self.incs) > 0:
             for inc in self.incs:
@@ -259,6 +266,8 @@ class CcTarget(Target):
 
 # TODO: warning
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0):
+    if prebuilt == 1:
+        export_dynamic = 1
     if export_dynamic == 1:
         target = CcTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', prebuilt, incs, export_dynamic)
     target = CcTarget(name, 'cc_library', srcs, deps, 'Library', prebuilt, incs, 0)
