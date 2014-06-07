@@ -114,6 +114,8 @@ class Target(object):
                     full_name, objs_name, deps)
         if self.type == 'cc_test':
             self.test_case = full_name
+        if self.type == 'cc_binary':
+            self.binary_name = full_name
         self.AddRule(rule)
 
     def RemoveSpecialChar(self, name):

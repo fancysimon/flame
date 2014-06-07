@@ -72,6 +72,7 @@ def RunImpl():
     LoadBuildFiles()
     GenerateSconsRules('run')
     RunScons()
+    RunBinary()
     return True
 
 def CleanImpl():
@@ -96,6 +97,37 @@ def RunTestCases():
     else:
         Info('%d test cases passed!' % success_test_case_num)
         Error('%d test cases failed!' % (test_case_num - success_test_case_num))
+
+def RunBinary():
+    global _option_args
+    if len(_option_args.args) == 0:
+        ErrorExit('Must specify one target to run.')
+    else:
+        # Only run the first target.
+        arg = _option_args.args[0]
+        fields = arg.split(':')
+        if len(fields) == 2:
+            if fields[0] != '':
+                ErrorExit('Target format is invalid.')
+            binary_name = ''
+            targets = GetAllTargets()
+            for target in targets:
+                if target.type == 'cc_binary':
+                    if target.name == fields[1]:
+                        binary_name = target.binary_name
+            if binary_name != '':
+                current_dir = GetCurrentDir()
+                binary_dir = os.path.dirname(binary_name)
+                os.chdir(binary_dir)
+                Info('Start to run %s ...' % fields[1])
+                ret = subprocess.call(binary_name)
+                if ret == 0:
+                    Info('Run %s success.' % fields[1])
+                else:
+                    Error("Run %s failed. The return code is %d." % (fields[1], ret))
+                os.chdir(current_dir)
+        else:
+            ErrorExit('Target format is invalid.')
 
 def LoadBuildFile(target=None):
     global _option_args
