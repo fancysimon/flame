@@ -44,6 +44,7 @@ def ComplementSubDeps(sorted_target_node_list):
             target.sub_objs += sub_target.sub_objs + sub_target.objs
             if sub_target.prebuilt == 1:
                 target.prebuilt_library_list.append(sub_target.name)
+                target.prebuilt_static_library_list.append(sub_target.target_name)
             recursive_library_list_str += sub_target.name + ','
         target.dep_library_list = RemoveDuplicate(target.dep_library_list)
         target.system_library_list = RemoveDuplicate(target.system_library_list)
@@ -51,6 +52,7 @@ def ComplementSubDeps(sorted_target_node_list):
         target.dep_header_list = RemoveDuplicate(target.dep_header_list)
         target.sub_objs = RemoveDuplicate(target.sub_objs)
         target.prebuilt_library_list = RemoveDuplicate(target.prebuilt_library_list)
+        target.prebuilt_static_library_list = RemoveDuplicate(target.prebuilt_static_library_list)
 
 # Dynamic library only dependent prebuild and system library.
 def GenerateRecursiveForSort():
