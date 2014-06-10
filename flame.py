@@ -12,16 +12,17 @@ from target_pool import *
 from util import *
 
 _option_args = None
+_option_targets = []
 
 def ParseOption():
     global _option_args
+    global _option_targets
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", default='build',
                         help="Build command: build test run clean.")
     parser.add_argument("-j", "--jobs", type=int, dest='jobs',
                         default=0, help="Number of jobs to run simultaneously.")
-    parser.add_argument('args', nargs=argparse.REMAINDER)
-    _option_args = parser.parse_args(sys.argv[1:])
+    _option_args, _option_targets = parser.parse_known_args()
     return parser
 
 def Main():
@@ -99,12 +100,12 @@ def RunTestCases():
         Error('%d test cases failed!' % (test_case_num - success_test_case_num))
 
 def RunBinary():
-    global _option_args
-    if len(_option_args.args) == 0:
+    global _option_targets
+    if len(_option_targets) == 0:
         ErrorExit('Must specify one target to run.')
     else:
         # Only run the first target.
-        arg = _option_args.args[0]
+        arg = _option_targets[0]
         fields = arg.split(':')
         if len(fields) == 2:
             if fields[0] != '':
@@ -145,12 +146,12 @@ def LoadBuildFile(target=None):
 def LoadBuildFiles():
     global _option_args
     Info('Loading BUILDs...')
-    if len(_option_args.args) == 0:
+    if len(_option_targets) == 0:
         LoadBuildFile()
     else:
-        arg = _option_args.args[0]
+        option_target = _option_targets[0]
         current_dir = GetCurrentDir()
-        if arg == '...':
+        if option_target == '...':
             for target_dir, _, _ in os.walk(current_dir):
                 os.chdir(target_dir)
                 build_name = GetBuildName()
@@ -159,9 +160,9 @@ def LoadBuildFiles():
                 LoadBuildFile()
             os.chdir(current_dir)
         else:
-            fields = arg.split(':')
+            fields = option_target.split(':')
             if len(fields) == 1:
-                target_dir = os.path.join(current_dir, arg)
+                target_dir = os.path.join(current_dir, option_target)
                 if not os.path.isdir(target_dir):
                     ErrorExit('Dir is not exists: %s' % target_dir)
                 os.chdir(target_dir)
