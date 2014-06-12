@@ -200,9 +200,9 @@ def RunScons(cmd):
         ErrorExit('There are some errors!')
     if cmd == 'install':
         cmd_list.append('install')
-    ret_code = subprocess.call(cmd_list)
-    if ret_code != 0:
-        ErrorExit('There are some errors when install!')
+        ret_code = subprocess.call(cmd_list)
+        if ret_code != 0:
+       	    ErrorExit('There are some errors when install!')
     os.chdir(current_dir)
 
 def Check():
