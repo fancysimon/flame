@@ -95,3 +95,10 @@ def RemoveDuplicate(item_list):
             result_list.append(item)
     return result_list
 
+def VarToList(var):
+    var_list = var
+    if isinstance(var, str):
+        var_list = [var]
+    return var_list
+
+

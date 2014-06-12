@@ -14,16 +14,10 @@ class Target(object):
                 prebuilt, incs, export_dynamic, export_static, release_prefix):
         self.name = name
         self.type = target_type
-        self.srcs = srcs
-        if isinstance(self.srcs, str):
-            self.srcs = [self.srcs]
+        self.srcs = VarToList(srcs)
         self.SrcReplaceRegex()
-        self.deps = deps
-        if isinstance(self.deps, str):
-            self.deps = [self.deps]
-        self.incs = incs
-        if isinstance(self.incs, str):
-            self.incs = [self.incs]
+        self.deps = VarToList(deps)
+        self.incs = VarToList(incs)
         self.scons_target_type = scons_target_type
         self.export_dynamic = export_dynamic
         self.export_static = export_static
@@ -315,8 +309,7 @@ def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
     target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, 0, 0)
 
 def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
-    if isinstance(deps, str):
-        deps = [deps]
+    deps = VarToList(deps)
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
     target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs, 0, 0)
 
