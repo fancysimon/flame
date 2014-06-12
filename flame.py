@@ -19,69 +19,58 @@ def ParseOption():
     global _option_targets
     parser = argparse.ArgumentParser()
     parser.add_argument("cmd", default='build',
-                        help="Build command: build test run clean.")
+                        help="Build command: build test run clean install.")
     parser.add_argument("-j", "--jobs", type=int, dest='jobs',
                         default=0, help="Number of jobs to run simultaneously.")
+    parser.add_argument("--prefix", dest='prefix',
+                        default="release", help="Install prefix path.")
     _option_args, _option_targets = parser.parse_known_args()
     return parser
 
 def Main():
     global _option_args
     parser = ParseOption()
-    if _option_args.cmd not in ['build', 'test', 'run', 'clean']:
+    if _option_args.cmd not in ['build', 'test', 'run', 'clean', 'install']:
         parser.print_help()
         ErrorExit('cmd is invalid.')
-    cmd_dict = {'build':Build, 'test':Test, 'run':Run, 'clean':Clean}
+    cmd_dict = {'build':Build, 'test':Test, 'run':Run, 'clean':Clean, 'install':Install}
     cmd = cmd_dict[_option_args.cmd]
     cmd()
 
 def Build():
-    if not BuildImpl():
-        Error('Build failed!')
-    else:
-        Info('Build success!')
-
-def Test():
-    TestImpl()
-
-def Run():
-    RunImpl()
-
-def Clean():
-    if CleanImpl():
-        Info('Clean success!')
-    else:
-        Error('Clean failed!')
-
-def BuildImpl():
     Check()
     LoadBuildFiles()
     GenerateSconsRules('build')
-    RunScons()
-    return True
+    RunScons('build')
+    Info('Build success!')
 
-def TestImpl():
+def Test():
     Check()
     LoadBuildFiles()
     GenerateSconsRules('test')
-    RunScons()
+    RunScons('test')
     RunTestCases()
-    return True
 
-def RunImpl():
+def Run():
     Check()
     LoadBuildFiles()
     GenerateSconsRules('run')
-    RunScons()
+    RunScons('run')
     RunBinary()
-    return True
 
-def CleanImpl():
+def Clean():
     Check()
     LoadBuildFiles()
-    GenerateSconsRules('build')
-    RunScons(True)
-    return True
+    GenerateSconsRules('clean')
+    RunScons('clean')
+    Info('Clean success!')
+
+def Install():
+    Check()
+    LoadBuildFiles()
+    GenerateSconsRules('install')
+    RunScons('install')
+    Info('Install success!')
 
 def RunTestCases():
     targets = GetAllTargets()
@@ -141,6 +130,9 @@ def LoadBuildFile(target=None):
         sys.argv = [target]
     if _option_args.cmd == 'test':
         sys.argv.append('-test')
+    if _option_args.cmd in ['install', 'clean'] :
+        abs_prefix = os.path.abspath(_option_args.prefix)
+        sys.argv.append('-prefix=%s' % abs_prefix)
     execfile(build_name)
 
 def LoadBuildFiles():
@@ -190,21 +182,28 @@ def GenerateSconsRules(cmd):
         scons_file.write(rule)
     scons_file.close()
 
-def RunScons(clean=False):
+def RunScons(cmd):
     global _option_args
     current_dir = GetCurrentDir()
     blame_root_dir = GetFlameRootDir()
     os.chdir(blame_root_dir)
     cmd_list = ['scons']
-    if clean:
+    if cmd == 'clean':
+        if os.path.isabs(_option_args.prefix):
+            cmd_list.append('install')
         cmd_list.append('-c')
     SelectJobs()
     if _option_args.jobs > 1:
         cmd_list.append('-j %d' % _option_args.jobs)
     ret_code = subprocess.call(cmd_list)
-    os.chdir(current_dir)
     if ret_code != 0:
         ErrorExit('There are some errors!')
+    if cmd == 'install':
+        cmd_list.append('install')
+    ret_code = subprocess.call(cmd_list)
+    if ret_code != 0:
+        ErrorExit('There are some errors when install!')
+    os.chdir(current_dir)
 
 def Check():
     if GetFlameRootDir() == '':
@@ -223,9 +222,9 @@ def SelectJobs():
 
 def GetSconsRules(cmd):
     target_types = []
-    if cmd == 'build' or cmd == 'run':
+    if cmd in ['build', 'run', 'install']:
         target_types += ['env', 'cc_library', 'cc_binary']
-    elif cmd == 'test':
+    elif cmd in ['test', 'clean']:
         target_types += ['env', 'cc_library', 'cc_binary', 'cc_test']
     targets = GetAllTargets()
     scons_rules = []
@@ -233,6 +232,8 @@ def GetSconsRules(cmd):
     for target in targets:
         if target.type in target_types:
             scons_rules += target.scons_rules
+        if cmd in ['install', 'clean']:
+            scons_rules += target.scons_rules_for_install
     return scons_rules
 
 if __name__ == '__main__':

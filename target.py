@@ -6,10 +6,12 @@ import os
 import copy
 from util import *
 import glob
+import string
 import target_pool
 
 class Target(object):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs, export_dynamic, export_static):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type,
+                prebuilt, incs, export_dynamic, export_static, release_prefix):
         self.name = name
         self.type = target_type
         self.srcs = srcs
@@ -25,6 +27,7 @@ class Target(object):
         self.scons_target_type = scons_target_type
         self.export_dynamic = export_dynamic
         self.export_static = export_static
+        self.release_prefix = release_prefix
         self.current_dir = GetCurrentDir()
         self.build_root_dir = GetBuildRootDir()
         self.relative_dir = GetRelativeDir(self.current_dir, GetFlameRootDir())
@@ -41,6 +44,7 @@ class Target(object):
         self.objs = []
         self.sub_objs = []
         self.scons_rules = []
+        self.scons_rules_for_install = []
         self.relative_name = os.path.join(self.relative_dir, self.name)
         self.relative_name = self.RemoveSpecialChar(self.relative_name)
         self.prebuilt = prebuilt
@@ -114,6 +118,15 @@ class Target(object):
             self.binary_name = full_name
         self.AddRule(rule)
 
+        # Generate install rule.
+        if self.type == 'cc_binary' or (self.type == 'cc_library' \
+                and (self.export_dynamic == 1 or self.export_static == 1)):
+            release_dir = os.path.join(self.release_prefix, 'lib')
+            if self.type == 'cc_binary':
+                release_dir = os.path.join(self.release_prefix, 'bin')
+            rule = '%s.Alias(\'install\', %s.Install(\'%s\', %s))\n' % (env, env, release_dir, self.target_name)
+            self.AddRuleForInstall(rule)
+
     def RemoveSpecialChar(self, name):
         name = name.replace('/', '_')
         name = name.replace('-', '_')
@@ -140,6 +153,9 @@ class Target(object):
 
     def AddRule(self, rule):
         self.scons_rules.append(rule)
+
+    def AddRuleForInstall(self, rule):
+        self.scons_rules_for_install.append(rule)
 
     def ParseAndAddTarget(self):
         self.AddObjs()
@@ -271,10 +287,15 @@ class Target(object):
         self.srcs = new_srcs
 
 class CcTarget(Target):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs, export_dynamic, export_static):
-        Target.__init__(self, name, target_type, srcs, deps, scons_target_type, prebuilt, incs, export_dynamic, export_static)
+    def __init__(self, name, target_type, srcs, deps, scons_target_type,
+                prebuilt, incs, export_dynamic, export_static):
+        release_prefix = ''
+        prefix_list = filter(lambda x:('-prefix=' in x), sys.argv)
+        if len(prefix_list) > 0:
+            release_prefix = prefix_list[0].split('=')[1]
+        Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
+                prebuilt, incs, export_dynamic, export_static, release_prefix)
         # build targets are send by sys.argv
-        build_target_list = sys.argv
         build_target_list = filter(lambda x:(len(x) > 0 and x[0] != '-'), sys.argv)
         if len(build_target_list) == 0 or name in build_target_list:
             if self.prebuilt == 0:
@@ -294,8 +315,6 @@ def cc_binary(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
     target = CcTarget(name, 'cc_binary', srcs, deps, 'Program', prebuilt, incs, 0, 0)
 
 def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
-    if '-test' not in sys.argv:
-        return
     if isinstance(deps, str):
         deps = [deps]
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
