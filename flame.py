@@ -198,11 +198,11 @@ def RunScons(cmd):
     ret_code = subprocess.call(cmd_list)
     if ret_code != 0:
         ErrorExit('There are some errors!')
-    if cmd == 'install':
+    if cmd == 'install' and NeedInstall():
         cmd_list.append('install')
         ret_code = subprocess.call(cmd_list)
         if ret_code != 0:
-       	    ErrorExit('There are some errors when install!')
+            ErrorExit('There are some errors when install!')
     os.chdir(current_dir)
 
 def Check():
@@ -237,6 +237,13 @@ def GetSconsRules(cmd):
         if cmd in ['install', 'clean']:
             scons_rules += target.scons_rules_for_install
     return scons_rules
+
+def NeedInstall():
+    targets = GetAllTargets()
+    scons_rules = []
+    for target in targets:
+        scons_rules += target.scons_rules_for_install
+    return len(scons_rules) > 0
 
 if __name__ == '__main__':
     Main()
