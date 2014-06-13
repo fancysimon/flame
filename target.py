@@ -213,7 +213,7 @@ class Target(object):
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, self.relative_dir)
                 self.dep_paths.append(dep_path)
-            elif len(dep) >= 2 and dep[0:2] == '//':
+            elif dep[0:2] == '//':
                 fields = dep[2:].split(':')
                 if len(fields) != 2:
                     ErrorExit('The format of deps(%s) is invalid.' % (dep))
@@ -283,10 +283,7 @@ class Target(object):
 class CcTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 prebuilt, incs, export_dynamic, export_static):
-        release_prefix = ''
-        prefix_list = filter(lambda x:('-prefix=' in x), sys.argv)
-        if len(prefix_list) > 0:
-            release_prefix = prefix_list[0].split('=')[1]
+        release_prefix = ParseReleasePrefix(sys.argv)
         Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
                 prebuilt, incs, export_dynamic, export_static, release_prefix)
         # build targets are send by sys.argv
@@ -296,6 +293,39 @@ class CcTarget(Target):
                 self.ParseAndAddTarget()
             elif self.prebuilt == 1:
                 self.AddPrebuiltTarget()
+
+class ExtraExportTarget(Target):
+    def __init__(self, headers, confs, files):
+        release_prefix = ParseReleasePrefix(sys.argv)
+        Target.__init__(self, 'extra_export', 'extra_export', [], [], '',
+                0, [], 0, 0, release_prefix)
+        self.export_headers = headers
+        self.export_confs = confs
+        self.export_files = files
+        self.ParseAndAddTarget()
+
+    def WriteRule(self):
+        release_include_dir = os.path.join(self.release_prefix, 'include')
+        release_conf_dir = os.path.join(self.release_prefix, 'conf')
+        release_data_dir = os.path.join(self.release_prefix, 'data')
+        self.WriteRuleForExtra(self.export_headers, release_include_dir)
+        self.WriteRuleForExtra(self.export_confs, release_conf_dir)
+        self.WriteRuleForExtra(self.export_files, release_data_dir)
+
+    def WriteRuleForExtra(self, extra_files, release_dir):
+        for extra_file in extra_files:
+            extra_file_list = VarToList(extra_file)
+            if extra_file_list[0][0:2] == '//':
+                extra_file_name = os.path.join(self.flame_root_dir, extra_file_list[0][2:])
+            else:
+                extra_file_name = os.path.join(self.current_dir, extra_file_list[0])
+            source_name = os.path.basename(extra_file_list[0])
+            if len(extra_file_list) == 2:
+                release_name = os.path.join(release_dir, extra_file_list[1])
+            else:
+                release_name = os.path.join(release_dir, source_name)
+            rule = 'env.Alias(\'install\', env.InstallAs(\'%s\', \'%s\'))\n' % (release_name, extra_file_name)
+            self.AddRuleForInstall(rule)
 
 # TODO: warning
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0, export_static=0):
@@ -313,3 +343,5 @@ def cc_test(name, srcs, deps=[], prebuilt=0, incs=[], warning='yes'):
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
     target = CcTarget(name, 'cc_test', srcs, deps, 'Program', prebuilt, incs, 0, 0)
 
+def extra_export(headers=[], confs=[], files=[]):
+    target = ExtraExportTarget(headers, confs, files)

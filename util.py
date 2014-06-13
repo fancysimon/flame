@@ -101,4 +101,10 @@ def VarToList(var):
         var_list = [var]
     return var_list
 
+def ParseReleasePrefix(args):
+    release_prefix = ''
+    prefix_list = filter(lambda x:('-prefix=' in x), args)
+    if len(prefix_list) > 0:
+        release_prefix = prefix_list[0].split('=')[1]
+    return release_prefix
 

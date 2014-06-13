@@ -224,6 +224,8 @@ def GetSconsRules(cmd):
     target_types = []
     if cmd in ['build', 'run', 'install']:
         target_types += ['env', 'cc_library', 'cc_binary']
+    if cmd == 'install':
+        target_types += ['extra_export']
     elif cmd in ['test', 'clean']:
         target_types += ['env', 'cc_library', 'cc_binary', 'cc_test']
     targets = GetAllTargets()
