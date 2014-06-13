@@ -32,6 +32,8 @@ def ComplementSubDeps(sorted_target_node_list):
     global _target_pool
     for node in sorted_target_node_list:
         target = _target_pool[node.key]
+        if target.type == 'extra_export':
+            continue
         recursive_library_list_str = ''
         for key in target.recursive_library_list:
             sub_target = _target_pool[key]
@@ -46,10 +48,10 @@ def ComplementSubDeps(sorted_target_node_list):
                 target.prebuilt_library_list.append(sub_target.name)
                 target.prebuilt_static_library_list.append(sub_target.target_name)
             recursive_library_list_str += sub_target.name + ','
+        target.dep_header_list = RemoveDuplicate(target.dep_header_list)
         target.dep_library_list = RemoveDuplicate(target.dep_library_list)
         target.system_library_list = RemoveDuplicate(target.system_library_list)
         target.dep_paths = RemoveDuplicate(target.dep_paths)
-        target.dep_header_list = RemoveDuplicate(target.dep_header_list)
         target.sub_objs = RemoveDuplicate(target.sub_objs)
         target.prebuilt_library_list = RemoveDuplicate(target.prebuilt_library_list)
         target.prebuilt_static_library_list = RemoveDuplicate(target.prebuilt_static_library_list)
