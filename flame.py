@@ -76,12 +76,21 @@ def RunTestCases():
     targets = GetAllTargets()
     test_case_num = 0
     success_test_case_num = 0
+    current_dir = GetCurrentDir()
     for target in targets:
         if target.type == 'cc_test':
+            MkdirIfNotExists(target.testcase_rundir)
+            os.chdir(target.testcase_rundir)
+            # Copy testdata symlink to run dir.
+            for pair in target.testdata_copy_pair:
+                target_dir = os.path.dirname(pair[1])
+                MkdirIfNotExists(target_dir)
+                Symlink(pair[0], pair[1])
             ret = subprocess.call(target.test_case)
             if ret == 0:
                 success_test_case_num += 1
             test_case_num += 1
+    os.chdir(current_dir)
     if test_case_num == success_test_case_num:
         Info('All test cases passed!')
     else:

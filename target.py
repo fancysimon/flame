@@ -47,7 +47,8 @@ class Target(object):
             self.key += self.dl_suffix
             self.target_name += self.dl_suffix
         self.release_prefix = ParseReleasePrefix(sys.argv)
-        self.full_name = os.path.join(self.build_root_dir, self.relative_dir, self.name)
+        self.full_name = os.path.join(self.build_root_dir,
+                self.relative_dir, self.name)
         self.prebuilt = 0
 
     def WriteRule(self):
@@ -119,7 +120,8 @@ class CcTarget(Target):
         Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, export_dynamic, export_static)
         # build targets are send by sys.argv
-        build_target_list = filter(lambda x:(len(x) > 0 and x[0] != '-'), sys.argv)
+        build_target_list = \
+                filter(lambda x:(len(x) > 0 and x[0] != '-'), sys.argv)
         if len(build_target_list) == 0 or name in build_target_list:
             self.ParseAndAddTarget()
 
@@ -207,7 +209,8 @@ class CcTarget(Target):
                     self.dep_library_list.append(library_name)
                 else:
                     self.dep_library_list.append(dep_library)
-                target_key = os.path.join(self.flame_root_dir, library_path, library_name)
+                target_key = os.path.join(self.flame_root_dir,
+                        library_path, library_name)
                 self.recursive_library_list.append(target_key)
                 dep_path = os.path.join(self.build_root_dir, library_path)
                 self.dep_paths.append(dep_path)
@@ -246,8 +249,8 @@ class CcTarget(Target):
 class CcLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, export_dynamic, export_static):
-        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static)
+        CcTarget.__init__(self, name, target_type, srcs, deps,
+                scons_target_type, incs, export_dynamic, export_static)
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
@@ -267,18 +270,43 @@ class CcBinaryTarget(CcTarget):
         CcTarget.WriteRule(self)
         self.binary_name = self.full_name
         release_dir = os.path.join(self.release_prefix, 'bin')
-        rule = '%s.Alias(\'install\', %s.Install(\'%s\', %s))\n' % (self.env, self.env, release_dir, self.target_name)
+        rule = '%s.Alias(\'install\', %s.Install(\'%s\', %s))\n' % (
+                self.env, self.env, release_dir, self.target_name)
         self.AddRuleForInstall(rule)
 
 class CcTestTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, export_dynamic, export_static, testdata):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, export_dynamic, export_static)
+        self.testdata = testdata
+        self.testcase_rundir = os.path.join(self.build_root_dir,
+                self.relative_dir, self.name + '.runfiles')
+        self.testdata_copy_pair = []
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
         self.test_case = self.full_name
+        self.WriteRuleForTestData()
+
+    def WriteRuleForTestData(self):
+        for test_file in self.testdata:
+            test_file_list = VarToList(test_file)
+            if test_file_list[0][0:2] == '//':
+                source_file_name = os.path.join(
+                        self.flame_root_dir, test_file_list[0][2:])
+                source_relative_name = test_file_list[0][2:]
+            else:
+                source_file_name = os.path.join(
+                        self.current_dir, test_file_list[0])
+                source_relative_name = test_file_list[0]
+            if len(test_file_list) == 2:
+                link_file_name = os.path.join(
+                        self.testcase_rundir, test_file_list[1])
+            else:
+                link_file_name = os.path.join(
+                        self.testcase_rundir, source_relative_name)
+            self.testdata_copy_pair.append((source_file_name, link_file_name))
 
 class PrebuiltLibraryTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
@@ -353,10 +381,10 @@ def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', expor
 def cc_binary(name, srcs, deps=[], incs=[], warning='yes'):
     target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', incs, 0, 0)
 
-def cc_test(name, srcs, deps=[], incs=[], warning='yes'):
+def cc_test(name, srcs, deps=[], incs=[], warning='yes', testdata=[]):
     deps = VarToList(deps)
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
-    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', incs, 0, 0)
+    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', incs, 0, 0, testdata)
 
 def extra_export(headers=[], confs=[], files=[]):
     target = ExtraExportTarget(headers, confs, files)
