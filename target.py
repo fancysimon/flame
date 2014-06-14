@@ -62,6 +62,7 @@ class Target(object):
 
     def RemoveSpecialChar(self, name):
         name = name.replace('/', '_')
+        name = name.replace('\\', '_')
         name = name.replace('-', '_')
         name = name.replace('.', '_')
         name = name.replace(':', '_')
