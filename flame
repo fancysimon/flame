@@ -1,4 +1,86 @@
 #!/bin/bash
 
-flame_dir=/data/xiongchao.xc/code/flame
-python2.6 $flame_dir/flame.py "$@"
+function _info() {
+    if [ -t 1 ]; then
+        echo -e "\033[1;36mFlame(info): $@\033[m" >&2
+    else
+        echo -e "Flame(info): $@" >&2
+    fi
+}
+
+function _warning() {
+    if [ -t 2 ]; then
+        echo -e "\033[1;33mFlame(warning): $@\033[m" >&2
+    else
+        echo -e "Flame(warning): $@" >&2
+    fi
+}
+
+function _error_exit() {
+    if [ -t 2 ]; then
+        echo -e "\033[1;31mFlame(error): $@\nFlame (error): Flame will exit...\033[m" >&2
+    else
+        echo -e "Flame(error): $@\nFlame (error): Flame will exit..." >&2
+    fi
+    exit 1
+}
+
+function _full_real_path() {
+    local o
+    local f
+    f="$1"
+
+    if [ ! -L "$0" ]; then
+        echo $f
+        return 0
+    fi
+
+    if o=`readlink -f $f 2>/dev/null`; then
+        echo "$o";
+        return 0
+    fi
+
+    # BSD readlink doesn't support -f
+    if o=`readlink $f`; then
+        f="$o"
+    fi
+
+    echo $(cd $(dirname $f) && pwd)/$(basename $f)
+    return 0
+}
+
+flame_path=`_full_real_path $0`
+flame_dir=$(cd $(dirname $flame_path) && pwd)
+flame_file="$flame_dir/flame.py"
+
+# Set your python here.
+#python_cmd=python
+python_cmd=python2.6
+
+# Check the python version at first, exit flame when python
+# version is under 2.6
+no_python=$(which ${python_cmd} 2>&1 | grep 'which: no')
+if [[ -n "$no_python" ]]; then
+    _error_exit "Please install python 2.6 or above in your system"
+fi
+
+python_ver=$(${python_cmd} -V 2>&1 | sed 's/Python //g')
+
+if [[ "$python_ver" < "2.6" ]]; then
+    _info "Python version in your machine: $python_ver"
+    _error_exit "Please upgrade your python version to 2.6 or above"
+fi
+
+# Check scons environment
+no_scons=$(which scons 2>&1 | grep 'which: no scons in')
+if [[ -n "$no_scons" ]]; then
+    _error_exit "Please install scons v2.0 or above on your machine"
+fi
+
+# Check flame file
+if [[ ! -f "$flame_file" ]]; then
+    _error_exit "Cannot find the core file $flame_file"
+fi
+
+${python_cmd} $flame_file "$@"
+

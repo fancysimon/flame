@@ -1,0 +1,19 @@
+#!/bin/bash
+
+flame_dir=$(cd $(dirname $0) && pwd)
+
+mkdir -p ~/bin
+echo -n "Installing flame..."
+chmod +x flame
+ln -sf $flame_dir/flame ~/bin
+
+if ! echo $PATH | grep "$HOME/bin" &> /dev/null; then
+    echo 'export PATH=~/bin:$PATH' >> ~/.bash_profile
+
+    if echo $SHELL | grep "zsh" &> /dev/null; then
+        echo 'export PATH=~/bin:$PATH' >> ~/.zshrc
+    fi
+fi
+
+echo ", Done."
+echo -e "\033[1;32mAll successful, please log in again or source ~/.bash_profile manually\033[0m"
