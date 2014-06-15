@@ -44,7 +44,7 @@ def ComplementSubDeps(sorted_target_node_list):
             target.dep_paths += sub_target.dep_paths
             target.dep_header_list += sub_target.dep_header_list
             target.sub_objs += sub_target.sub_objs + sub_target.objs
-            if sub_target.prebuilt == 1:
+            if sub_target.data.get('prebuilt') == 1:
                 target.prebuilt_library_list.append(sub_target.name)
                 target.prebuilt_static_library_list.append(sub_target.target_name)
             recursive_library_list_str += sub_target.name + ','
@@ -69,7 +69,7 @@ def GenerateRecursiveForSort():
             if key not in _target_pool:
                 continue
             sub_target = _target_pool[key]
-            if sub_target.prebuilt == 1:
+            if sub_target.data.get('prebuilt') == 1:
                 new_recursive_library_list.append(key)
         target.recursive_library_list_for_sort = new_recursive_library_list
 

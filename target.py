@@ -24,7 +24,7 @@ class Target(object):
         self.build_root_dir = GetBuildRootDir()
         self.relative_dir = GetRelativeDir(self.current_dir, GetFlameRootDir())
         self.flame_root_dir = GetFlameRootDir()
-        
+
         self.key = os.path.join(self.current_dir, self.name)
         self.relative_name = os.path.join(self.relative_dir, self.name)
         self.relative_name = self.RemoveSpecialChar(self.relative_name)
@@ -32,7 +32,7 @@ class Target(object):
         self.full_name = os.path.join(self.build_root_dir,
             self.relative_dir, self.name)
         self.dl_suffix = ''
-        
+
         self.system_library_list = []
         self.prebuilt_library_list = []
         self.prebuilt_static_library_list = []
@@ -45,9 +45,8 @@ class Target(object):
         self.scons_rules_for_install = []
         self.objs = []
         self.sub_objs = []
-        self.prebuilt = 0
         self.data = {}
-        
+
         self.release_prefix = ParseReleasePrefix(sys.argv)
 
     def WriteRule(self):
