@@ -11,18 +11,20 @@ import target_pool
 
 class Target(object):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, defs, export_dynamic, export_static, warning):
         self.name = name
         self.type = target_type
         self.incs = VarToList(incs)
         self.srcs = VarToList(srcs)
         self.SrcReplaceRegex()
         self.deps = VarToList(deps)
+        self.defs = VarToList(defs)
         self.objs = []
         self.sub_objs = []
         self.scons_target_type = scons_target_type
         self.export_dynamic = export_dynamic
         self.export_static = export_static
+        self.warning = warning
         self.current_dir = GetCurrentDir()
         self.build_root_dir = GetBuildRootDir()
         self.relative_dir = GetRelativeDir(self.current_dir, GetFlameRootDir())
@@ -54,19 +56,30 @@ class Target(object):
     def WriteRule(self):
         self.env = self.relative_name + self.dl_suffix + '_env'
         self.env = self.RemoveSpecialChar(self.env)
-        rule = '%s = env.Clone()\n' % (self.env)
+        rule = '%s = env.Clone()' % (self.env)
         self.AddRule(rule)
+        macros = []
+        # Warning.
+        if self.warning == 'no':
+            macros += ['-w']
+        # Macro.
+        if self.defs:
+            macros += [('-D' + macro) for macro in self.defs]
+        if macros:
+            rule = '%s.Append(CPPFLAGS=%s)' % (self.env, macros)
+            self.AddRule(rule)
         # Include path.
-        if len(self.dep_header_list) > 0:
-            rule = '%s.Append(CPPPATH=%s)\n' % (self.env, self.dep_header_list)
+        if self.dep_header_list:
+            rule = '%s.Append(CPPPATH=%s)' % (self.env, self.dep_header_list)
             self.AddRule(rule)
 
     def RemoveSpecialChar(self, name):
-        name = name.replace('/', '_')
-        name = name.replace('\\', '_')
-        name = name.replace('-', '_')
-        name = name.replace('.', '_')
-        name = name.replace(':', '_')
+        name = name.replace('/', '_mAgIc_')
+        name = name.replace('\\', '_mAgIc_')
+        name = name.replace('-', '_mAgIc_')
+        name = name.replace('.', '_mAgIc_')
+        name = name.replace(':', '_mAgIc_')
+        name = name.replace('+', '_mAgIc_')
         return name
 
     def FormatDepLibrary(self):
@@ -87,10 +100,10 @@ class Target(object):
         return res
 
     def AddRule(self, rule):
-        self.scons_rules.append(rule)
+        self.scons_rules.append(rule + '\n')
 
     def AddRuleForInstall(self, rule):
-        self.scons_rules_for_install.append(rule)
+        self.scons_rules_for_install.append(rule + '\n')
 
     def AddToTargetPool(self):
         targets = target_pool.GetTargetPool()
@@ -116,9 +129,9 @@ class Target(object):
 
 class CcTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, defs, export_dynamic, export_static, warning):
         Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static)
+                incs, defs, export_dynamic, export_static, warning)
         # build targets are send by sys.argv
         build_target_list = \
                 filter(lambda x:(len(x) > 0 and x[0] != '-'), sys.argv)
@@ -248,9 +261,9 @@ class CcTarget(Target):
 
 class CcLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, defs, export_dynamic, export_static, warning):
         CcTarget.__init__(self, name, target_type, srcs, deps,
-                scons_target_type, incs, export_dynamic, export_static)
+                scons_target_type, incs, defs, export_dynamic, export_static, warning)
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
@@ -262,9 +275,9 @@ class CcLibraryTarget(CcTarget):
 
 class CcBinaryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, defs, export_dynamic, export_static, warning):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static)
+                incs, defs, export_dynamic, export_static, warning)
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
@@ -276,9 +289,9 @@ class CcBinaryTarget(CcTarget):
 
 class CcTestTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static, testdata):
+                incs, defs, export_dynamic, export_static, warning, testdata):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static)
+                incs, defs, export_dynamic, export_static, warning)
         self.testdata = testdata
         self.testcase_rundir = os.path.join(self.build_root_dir,
                 self.relative_dir, self.name + '.runfiles')
@@ -310,9 +323,9 @@ class CcTestTarget(CcTarget):
 
 class PrebuiltLibraryTarget(Target):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static):
+                incs, defs, export_dynamic, export_static, warning):
         Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, export_dynamic, export_static)
+                incs, defs, export_dynamic, export_static, warning)
         self.prebuilt = 1
         build_target_list = filter(lambda x:(len(x) > 0 and x[0] != '-'), sys.argv)
         if len(build_target_list) == 0 or name in build_target_list:
@@ -367,24 +380,23 @@ class ExtraExportTarget(Target):
             rule = 'env.Alias(\'install\', env.InstallAs(\'%s\', \'%s\'))\n' % (release_name, extra_file_name)
             self.AddRuleForInstall(rule)
 
-# TODO: warning
-def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], warning='yes', export_dynamic=0, export_static=0):
+def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0):
     if prebuilt == 1:
         export_dynamic = 1
-        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, 1, 0)
-        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, 0, export_static)
+        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
+        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
         return
     if export_dynamic == 1:
-        target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, 1, 0)
-    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, 0, export_static)
+        target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
+    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
 
-def cc_binary(name, srcs, deps=[], incs=[], warning='yes'):
-    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', incs, 0, 0)
+def cc_binary(name, srcs, deps=[], incs=[], defs=[], warning='yes'):
+    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', incs, defs, 0, 0, warning)
 
-def cc_test(name, srcs, deps=[], incs=[], warning='yes', testdata=[]):
+def cc_test(name, srcs, deps=[], incs=[], defs=[], warning='yes', testdata=[]):
     deps = VarToList(deps)
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
-    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', incs, 0, 0, testdata)
+    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', incs, defs, 0, 0, warning, testdata)
 
 def extra_export(headers=[], confs=[], files=[]):
     target = ExtraExportTarget(headers, confs, files)

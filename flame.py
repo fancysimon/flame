@@ -150,34 +150,35 @@ def LoadBuildFiles():
     if len(_option_targets) == 0:
         LoadBuildFile()
     else:
-        option_target = _option_targets[0]
         current_dir = GetCurrentDir()
-        if option_target == '...':
-            for target_dir, _, _ in os.walk(current_dir):
-                os.chdir(target_dir)
-                build_name = GetBuildName()
-                if not os.path.isfile(build_name):
-                    continue
-                LoadBuildFile()
-            os.chdir(current_dir)
-        else:
-            fields = option_target.split(':')
-            if len(fields) == 1:
-                target_dir = os.path.join(current_dir, option_target)
-                if not os.path.isdir(target_dir):
-                    ErrorExit('Dir is not exists: %s' % target_dir)
-                os.chdir(target_dir)
-                LoadBuildFile()
+        for option_target in _option_targets:
+            if option_target == '...':
+                for target_dir, _, _ in os.walk(current_dir):
+                    os.chdir(target_dir)
+                    build_name = GetBuildName()
+                    if not os.path.isfile(build_name):
+                        continue
+                    LoadBuildFile()
                 os.chdir(current_dir)
-            elif len(fields) == 2:
-                target_dir = os.path.join(current_dir, fields[0])
-                if not os.path.isdir(target_dir):
-                    ErrorExit('Dir is not exists: %s' % target_dir)
-                os.chdir(target_dir)
-                LoadBuildFile(fields[1])
-                os.chdir(current_dir)
+                break
             else:
-                ErrorExit('Target format is invalid.')
+                fields = option_target.split(':')
+                if len(fields) == 1:
+                    target_dir = os.path.join(current_dir, option_target)
+                    if not os.path.isdir(target_dir):
+                        ErrorExit('Dir is not exists: %s' % target_dir)
+                    os.chdir(target_dir)
+                    LoadBuildFile()
+                    os.chdir(current_dir)
+                elif len(fields) == 2:
+                    target_dir = os.path.join(current_dir, fields[0])
+                    if not os.path.isdir(target_dir):
+                        ErrorExit('Dir is not exists: %s' % target_dir)
+                    os.chdir(target_dir)
+                    LoadBuildFile(fields[1])
+                    os.chdir(current_dir)
+                else:
+                    ErrorExit('Target format is invalid.')
 
 def GenerateSconsRules(cmd):
     WriteRuleForAllTargets()
