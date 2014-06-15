@@ -116,4 +116,3 @@ def Symlink(source, link_name):
     if os.path.isfile(link_name) or os.path.islink(link_name):
         os.remove(link_name)
     os.symlink(source, link_name)
-

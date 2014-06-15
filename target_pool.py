@@ -60,7 +60,7 @@ def ComplementSubDeps(sorted_target_node_list):
 def GenerateRecursiveForSort():
     global _target_pool
     for target in _target_pool.values():
-        if target.export_dynamic == 0:
+        if target.data.get('export_dynamic') != 1:
             target.recursive_library_list_for_sort = \
                     copy.copy(target.recursive_library_list)
             continue
