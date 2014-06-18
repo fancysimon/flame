@@ -327,10 +327,10 @@ class CcTestTarget(CcTarget):
                         self.testcase_rundir, source_relative_name)
             self.testdata_copy_pair.append((source_file_name, link_file_name))
 
-class PrebuiltLibraryTarget(Target):
+class CcPrebuiltLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, defs, export_dynamic, export_static, warning):
-        Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
+        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, defs)
         self.data['export_dynamic'] = export_dynamic
         self.data['export_static'] = export_static
@@ -342,6 +342,7 @@ class PrebuiltLibraryTarget(Target):
             self.target_name += self.dl_suffix
 
     def WriteRule(self):
+        # Do not need to call CcTarget.WriteRule()
         Target.WriteRule(self)
         prebuilt_suffix = 'a'
         if self.data.get('export_dynamic') == 1:
@@ -351,14 +352,14 @@ class PrebuiltLibraryTarget(Target):
         prebuilt_source = os.path.join(self.flame_root_dir, self.relative_dir, 'lib', prebuilt_name)
         rule = 'Command(\"%s\", \"%s\", Copy(\"$TARGET\", \"$SOURCE\"))' % (prebuilt_target, prebuilt_source)
         self.AddRule(rule)
-        rule = '%s = env.File(\"%s\")' % (self.relative_name, prebuilt_target)
+        rule = '%s = env.File(\"%s\")' % (self.target_name, prebuilt_target)
         self.AddRule(rule)
 
     def ParseAndAddTarget(self):
-        self.AddPrebuiltTarget()
-
-    def AddPrebuiltTarget(self):
         self.ParseDepHeader()
+        self.ParseDeps()
+        self.ParseDepHeader()
+        self.ParseDepsRecursive()
         self.AddToTargetPool()
 
 class ExtraExportTarget(Target):
@@ -396,10 +397,9 @@ class ExtraExportTarget(Target):
 
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0):
     if prebuilt == 1:
-        export_dynamic = 1
-        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
+        target = CcPrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
         target.RegisterTarget()
-        target = PrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
+        target = CcPrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
         target.RegisterTarget()
         return
     if export_dynamic == 1:
