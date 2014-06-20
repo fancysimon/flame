@@ -231,21 +231,25 @@ def SelectJobs():
     Info('Jobs number is %d.' % _option_args.jobs)
 
 def GetSconsRules(cmd):
-    target_types = []
-    if cmd in ['build', 'run', 'install']:
-        target_types += ['env', 'cc_library', 'cc_binary']
+    target_types = ['env', 'cc_library', 'cc_binary', 'proto_library']
     if cmd == 'install':
         target_types += ['extra_export']
     elif cmd in ['test', 'clean']:
-        target_types += ['env', 'cc_library', 'cc_binary', 'cc_test']
+        target_types += ['cc_test']
     targets = GetAllTargets()
     scons_rules = []
-    scons_rules.append('env = Environment(CPPPATH=[\"%s\"])\n' % (GetFlameRootDir()))
+    scons_rules.append('import SCons\n\n')
+    scons_rules.append('env = Environment(CPPPATH=[\"%s\", \"%s\"])\n\n' % (GetFlameRootDir(), GetBuildRootDir()))
+    # Add builder for protobuf.
+    scons_rules += ProtoBuilderRules()
+
     for target in targets:
         if target.type in target_types:
             scons_rules += target.scons_rules
+            scons_rules.append('\n')
         if cmd in ['install', 'clean']:
             scons_rules += target.scons_rules_for_install
+            scons_rules.append('\n')
     return scons_rules
 
 def NeedInstall():

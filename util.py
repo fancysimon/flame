@@ -81,9 +81,12 @@ def GetSconsFileName(scons_dir):
 def GetBuildName():
     return os.path.join(GetCurrentDir(), 'BUILD')
 
+def GetBuildDirName():
+    return 'flame-bin'
+
 def GetBuildRootDir():
     flame_root = GetFlameRootDir()
-    return os.path.join(flame_root, 'flame-bin')
+    return os.path.join(flame_root, GetBuildDirName())
 
 def GetCpuCount():
     return multiprocessing.cpu_count()
@@ -116,3 +119,19 @@ def Symlink(source, link_name):
     if os.path.isfile(link_name) or os.path.islink(link_name):
         os.remove(link_name)
     os.symlink(source, link_name)
+
+def ProtoBuilderRules():
+    protoc_bin = 'thirdparty/protobuf/bin/protoc'
+    protobuf_incs = 'thirdparty'
+    builder_list = []
+    scons_rules = []
+    scons_rules.append(
+            'proto_builder = Builder('
+            'action = SCons.Action.Action("%s --proto_path=. -I. -I%s'
+            ' -I=`dirname $SOURCE` --cpp_out=%s $SOURCE"))\n\n' % (
+                protoc_bin, protobuf_incs, GetBuildDirName()))
+    builder_list.append('BUILDERS = {"Proto" : proto_builder}')
+    for builder in builder_list:
+        scons_rules.append('env.Append(%s)\n\n' % builder)
+    return scons_rules
+

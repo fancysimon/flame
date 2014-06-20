@@ -23,6 +23,7 @@ class Target(object):
         self.current_dir = GetCurrentDir()
         self.build_root_dir = GetBuildRootDir()
         self.relative_dir = GetRelativeDir(self.current_dir, GetFlameRootDir())
+        self.relative_build_dir = os.path.join(GetBuildDirName(), self.relative_dir)
         self.flame_root_dir = GetFlameRootDir()
 
         self.key = os.path.join(self.current_dir, self.name)
@@ -281,10 +282,9 @@ class CcLibraryTarget(CcTarget):
             self.AddRuleForInstall(rule)
 
 class CcBinaryTarget(CcTarget):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type, defs):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs)
+                [], defs)
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
@@ -296,8 +296,8 @@ class CcBinaryTarget(CcTarget):
 
 class CcTestTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs, testdata):
-        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type, incs, defs)
+                defs, testdata):
+        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type, [], defs)
         self.testdata = testdata
         self.testcase_rundir = os.path.join(self.build_root_dir,
                 self.relative_dir, self.name + '.runfiles')
@@ -395,6 +395,62 @@ class ExtraExportTarget(Target):
     def ParseAndAddTarget(self):
         self.AddToTargetPool()
 
+class ProtoLibraryTarget(CcTarget):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type):
+        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
+                [], [])
+
+    def WriteRule(self):
+        Target.WriteRule(self)
+        for i in range(len(self.objs)):
+            obj = self.objs[i]
+            obj_target_name = self.obj_target_names[i]
+            src_with_path = self.srcs_with_path[i]
+            proto_with_path = self.protos_with_path[i]
+            inc_with_path = self.incs_with_path[i]
+            proto_list = [inc_with_path, src_with_path]
+            rule = '%s.%s(%s, \"%s\")' % (
+                    self.env, self.scons_target_type, proto_list, proto_with_path)
+            self.AddRule(rule)
+            rule = '%s = %s.SharedObject(target = \"%s\", source = \"%s\")' % (
+                    obj, self.env, obj_target_name, src_with_path)
+            self.AddRule(rule)
+
+        objs_name = self.relative_dir + '_' + self.name + '_objs'
+        objs_name = self.RemoveSpecialChar(objs_name)
+        rule = '%s = [%s]' % (objs_name, ','.join(self.objs))
+        self.AddRule(rule)
+        deps = self.FormatDepLibrary()
+        rule = '%s = %s.Library(\"%s\", %s, LIBS=%s)' % (
+                self.target_name, self.env, self.full_name, objs_name, deps)
+        self.AddRule(rule)
+
+    def AddObjs(self):
+        self.srcs_with_path = []
+        self.incs_with_path = []
+        self.protos_with_path = []
+        new_srcs = []
+        for src in self.srcs:
+            proto_prefix = src[:-5]
+            src_with_path = os.path.join(self.relative_build_dir, proto_prefix + 'pb.cc')
+            inc_with_path = os.path.join(self.relative_build_dir, proto_prefix + 'pb.h')
+            proto_with_path = os.path.join(self.relative_dir, src)
+            self.srcs_with_path.append(src_with_path)
+            self.incs_with_path.append(inc_with_path)
+            self.protos_with_path.append(proto_with_path)
+            new_srcs.append(os.path.basename(src_with_path))
+        self.srcs = new_srcs
+        self.objs = []
+        self.obj_target_names = []
+        for src_with_path in self.srcs_with_path:
+            src = os.path.basename(src_with_path)
+            obj_target_name = os.path.join(self.build_root_dir, self.relative_dir,
+                    self.name + '.objs', src + '.o')
+            self.obj_target_names.append(obj_target_name)
+            obj = self.relative_dir + "_" + src + '_obj'
+            obj = self.RemoveSpecialChar(obj)
+            self.objs.append(obj)
+
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0):
     if prebuilt == 1:
         target = CcPrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
@@ -408,16 +464,21 @@ def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='ye
     target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
     target.RegisterTarget()
 
-def cc_binary(name, srcs, deps=[], incs=[], defs=[]):
-    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', incs, defs)
+def cc_binary(name, srcs, deps=[], defs=[]):
+    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', defs)
     target.RegisterTarget()
 
-def cc_test(name, srcs, deps=[], incs=[], defs=[], testdata=[]):
+def cc_test(name, srcs, deps=[], defs=[], testdata=[]):
     deps = VarToList(deps)
     deps += ['//thirdparty/gtest:gtest', '//thirdparty/gtest:gtest_main']
-    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', incs, defs, testdata)
+    target = CcTestTarget(name, 'cc_test', srcs, deps, 'Program', defs, testdata)
     target.RegisterTarget()
 
 def extra_export(headers=[], confs=[], files=[]):
     target = ExtraExportTarget(headers, confs, files)
     target.RegisterTarget()
+
+def proto_library(name, srcs=[], deps=[]):
+    target = ProtoLibraryTarget(name, 'proto_library', srcs, deps, 'Proto')
+    target.RegisterTarget()
+
