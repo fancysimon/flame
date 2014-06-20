@@ -213,6 +213,9 @@ def RunScons(cmd):
         ret_code = subprocess.call(cmd_list)
         if ret_code != 0:
             ErrorExit('There are some errors when install!')
+
+    scons_file_name = GetSconsFileName(GetFlameRootDir())
+    os.remove(scons_file_name)
     os.chdir(current_dir)
 
 def Check():
