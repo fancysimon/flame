@@ -108,6 +108,7 @@ class CmdParser(object):
         self.CheckBuildCommand()
 
 def GetCmdParser():
+    '''Get CmdParser singleton.'''
     global _cmd_parser
     if _cmd_parser == None:
         _cmd_parser = CmdParser()

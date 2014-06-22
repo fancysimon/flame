@@ -10,6 +10,8 @@ import string
 import target_pool
 
 class Target(object):
+    '''Base class of Target.
+    '''
     def __init__(self, name, target_type, srcs, deps, scons_target_type, incs, defs):
         self.name = name
         self.type = target_type
@@ -71,12 +73,13 @@ class Target(object):
             self.AddRule(rule)
 
     def RemoveSpecialChar(self, name):
-        name = name.replace('/', '_mAgIc_')
-        name = name.replace('\\', '_mAgIc_')
-        name = name.replace('-', '_mAgIc_')
-        name = name.replace('.', '_mAgIc_')
-        name = name.replace(':', '_mAgIc_')
-        name = name.replace('+', '_mAgIc_')
+        magic_str = '_mAgIc_'
+        name = name.replace('/', magic_str)
+        name = name.replace('\\', magic_str)
+        name = name.replace('-', magic_str)
+        name = name.replace('.', magic_str)
+        name = name.replace(':', magic_str)
+        name = name.replace('+', magic_str)
         return name
 
     def FormatDepLibrary(self):

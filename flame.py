@@ -2,6 +2,10 @@
 # All rights reserved.
 # Author: Chao Xiong <fancysimon@gmail.com>
 
+'''
+Flame.
+'''
+
 import os
 import subprocess
 import sys

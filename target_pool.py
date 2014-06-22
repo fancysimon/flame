@@ -2,6 +2,10 @@
 # All rights reserved.
 # Author: Chao Xiong <fancysimon@gmail.com>
 
+'''
+Target pool.
+'''
+
 import os
 import copy
 from util import *

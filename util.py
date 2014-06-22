@@ -1,3 +1,11 @@
+# Copyright (c) 2014, The Flame Authors.
+# All rights reserved.
+# Author: Chao Xiong <fancysimon@gmail.com>
+
+'''
+Flame utility.
+'''
+
 import os
 import sys
 import multiprocessing
@@ -90,11 +98,11 @@ def GetBuildRootDir():
 
 def GetBuildDebugRootDir():
     flame_root = GetFlameRootDir()
-    return os.path.join(flame_root, 'FLAME_DEBUG')
+    return os.path.join(flame_root, 'build_debug')
 
 def GetBuildReleaseRootDir():
     flame_root = GetFlameRootDir()
-    return os.path.join(flame_root, 'FLAME_RELEASE')
+    return os.path.join(flame_root, 'build_release')
 
 def GetCpuCount():
     return multiprocessing.cpu_count()
