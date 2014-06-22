@@ -2,77 +2,62 @@
 # All rights reserved.
 # Author: Chao Xiong <fancysimon@gmail.com>
 
-import argparse
 import os
-import parser
 import subprocess
 import sys
 from target import *
 from target_pool import *
 from util import *
-
-_option_args = None
-_option_targets = []
-
-def ParseOption():
-    global _option_args
-    global _option_targets
-    parser = argparse.ArgumentParser()
-    parser.add_argument("cmd", default='build',
-                        help="Build command: build test run clean install.")
-    parser.add_argument("-j", "--jobs", type=int, dest='jobs',
-                        default=0, help="Number of jobs to run simultaneously.")
-    parser.add_argument("--prefix", dest='prefix',
-                        default="release", help="Install prefix path.")
-    _option_args, _option_targets = parser.parse_known_args()
-    return parser
+from cmd_parser import *
 
 def Main():
-    global _option_args
-    parser = ParseOption()
-    if _option_args.cmd not in ['build', 'test', 'run', 'clean', 'install']:
-        parser.print_help()
-        ErrorExit('cmd is invalid.')
+    cmd_parser = GetCmdParser()
+    ChooseDebugOrRelease()
     cmd_dict = {'build':Build, 'test':Test, 'run':Run, 'clean':Clean, 'install':Install}
-    cmd = cmd_dict[_option_args.cmd]
+    cmd = cmd_dict[cmd_parser.options.command]
     cmd()
 
+def ChooseDebugOrRelease():
+    cmd_parser = GetCmdParser()
+    if cmd_parser.options.profile == 'release':
+        build_dir = GetBuildReleaseRootDir()
+    else:
+        build_dir = GetBuildDebugRootDir()
+    MkdirIfNotExists(build_dir)
+    Symlink(build_dir, GetBuildRootDir())
+
 def Build():
-    Check()
     LoadBuildFiles()
     GenerateSconsRules('build')
     RunScons('build')
     Info('Build success!')
 
 def Test():
-    Check()
     LoadBuildFiles()
     GenerateSconsRules('test')
     RunScons('test')
     RunTestCases()
 
 def Run():
-    Check()
     LoadBuildFiles()
     GenerateSconsRules('run')
     RunScons('run')
     RunBinary()
 
 def Clean():
-    Check()
     LoadBuildFiles()
     GenerateSconsRules('clean')
     RunScons('clean')
     Info('Clean success!')
 
 def Install():
-    Check()
     LoadBuildFiles()
     GenerateSconsRules('install')
     RunScons('install')
     Info('Install success!')
 
 def RunTestCases():
+    cmd_parser = GetCmdParser()
     targets = GetAllTargets()
     test_case_num = 0
     success_test_case_num = 0
@@ -86,7 +71,10 @@ def RunTestCases():
                 target_dir = os.path.dirname(pair[1])
                 MkdirIfNotExists(target_dir)
                 Symlink(pair[0], pair[1])
-            ret = subprocess.call(target.test_case)
+            cmd_list = [target.test_case]
+            if cmd_parser.options.args:
+                cmd_list += cmd_parser.options.args.split(' ')
+            ret = subprocess.call(cmd_list)
             if ret == 0:
                 success_test_case_num += 1
             test_case_num += 1
@@ -98,38 +86,38 @@ def RunTestCases():
         Error('%d test cases failed!' % (test_case_num - success_test_case_num))
 
 def RunBinary():
-    global _option_targets
-    if len(_option_targets) == 0:
-        ErrorExit('Must specify one target to run.')
-    else:
-        # Only run the first target.
-        arg = _option_targets[0]
-        fields = arg.split(':')
-        if len(fields) == 2:
-            if fields[0] != '':
-                ErrorExit('Target format is invalid.')
-            binary_name = ''
-            targets = GetAllTargets()
-            for target in targets:
-                if target.type == 'cc_binary':
-                    if target.name == fields[1]:
-                        binary_name = target.binary_name
-            if binary_name != '':
-                current_dir = GetCurrentDir()
-                binary_dir = os.path.dirname(binary_name)
-                os.chdir(binary_dir)
-                Info('Start to run %s ...' % fields[1])
-                ret = subprocess.call(binary_name)
-                if ret == 0:
-                    Info('Run %s success.' % fields[1])
-                else:
-                    Error("Run %s failed. The return code is %d." % (fields[1], ret))
-                os.chdir(current_dir)
-        else:
+    cmd_parser = GetCmdParser()
+    # Only run the first target.
+    run_target = cmd_parser.targets[0]
+    fields = run_target.split(':')
+    if len(fields) == 2:
+        if fields[0] != '':
             ErrorExit('Target format is invalid.')
+        binary_name = ''
+        targets = GetAllTargets()
+        for target in targets:
+            if target.type == 'cc_binary':
+                if target.name == fields[1]:
+                    binary_name = target.binary_name
+        if binary_name != '':
+            current_dir = GetCurrentDir()
+            binary_dir = os.path.dirname(binary_name)
+            cmd_list = [binary_name]
+            if cmd_parser.options.args:
+                cmd_list += cmd_parser.options.args.split(' ')
+            os.chdir(binary_dir)
+            Info('Start to run %s ...' % fields[1])
+            ret = subprocess.call(cmd_list)
+            if ret == 0:
+                Info('Run %s success.' % fields[1])
+            else:
+                Error("Run %s failed. The return code is %d." % (fields[1], ret))
+            os.chdir(current_dir)
+    else:
+        ErrorExit('Target format is invalid.')
 
 def LoadBuildFile(target=None):
-    global _option_args
+    cmd_parser = GetCmdParser()
     build_name = GetBuildName()
     if not os.path.isfile(build_name):
         ErrorExit('BUILD not find.')
@@ -137,21 +125,22 @@ def LoadBuildFile(target=None):
     sys.argv = []
     if target != None:
         sys.argv = [target]
-    if _option_args.cmd == 'test':
+    if cmd_parser.options.command == 'test':
         sys.argv.append('-test')
-    if _option_args.cmd in ['install', 'clean'] :
-        abs_prefix = os.path.abspath(_option_args.prefix)
+    if cmd_parser.options.command in ['install', 'clean'] :
+        abs_prefix = os.path.abspath(cmd_parser.options.prefix)
         sys.argv.append('-prefix=%s' % abs_prefix)
     execfile(build_name)
 
 def LoadBuildFiles():
-    global _option_args
+    Check()
+    cmd_parser = GetCmdParser()
     Info('Loading BUILDs...')
-    if len(_option_targets) == 0:
+    if len(cmd_parser.targets) == 0:
         LoadBuildFile()
     else:
         current_dir = GetCurrentDir()
-        for option_target in _option_targets:
+        for option_target in cmd_parser.targets:
             if option_target == '...':
                 for target_dir, _, _ in os.walk(current_dir):
                     os.chdir(target_dir)
@@ -193,18 +182,18 @@ def GenerateSconsRules(cmd):
     scons_file.close()
 
 def RunScons(cmd):
-    global _option_args
+    cmd_parser = GetCmdParser()
     current_dir = GetCurrentDir()
     blame_root_dir = GetFlameRootDir()
     os.chdir(blame_root_dir)
     cmd_list = ['scons']
     if cmd == 'clean':
-        if os.path.isabs(_option_args.prefix):
+        if os.path.isabs(cmd_parser.options.prefix):
             cmd_list.append('install')
         cmd_list.append('-c')
     SelectJobs()
-    if _option_args.jobs > 1:
-        cmd_list.append('-j %d' % _option_args.jobs)
+    if cmd_parser.options.jobs > 1:
+        cmd_list.append('-j %d' % cmd_parser.options.jobs)
     ret_code = subprocess.call(cmd_list)
     if ret_code != 0:
         ErrorExit('There are some errors!')
@@ -223,29 +212,38 @@ def Check():
         ErrorExit('FLAME_ROOT not find!')
 
 def SelectJobs():
-    global _option_args
-    if _option_args.jobs <= 0:
+    cmd_parser = GetCmdParser()
+    if cmd_parser.options.jobs <= 0:
         jobs = GetCpuCount()
         if jobs <= 4:
             jobs *= 2
         elif jobs > 8:
             jobs = 8
-        _option_args.jobs = jobs
-    Info('Jobs number is %d.' % _option_args.jobs)
+        cmd_parser.options.jobs = jobs
+    Info('Jobs number is %d.' % cmd_parser.options.jobs)
 
 def GetSconsRules(cmd):
+    cmd_parser = GetCmdParser()
     target_types = ['env', 'cc_library', 'cc_binary', 'proto_library']
     if cmd == 'install':
         target_types += ['extra_export']
     elif cmd in ['test', 'clean']:
         target_types += ['cc_test']
-    targets = GetAllTargets()
+    
     scons_rules = []
     scons_rules.append('import SCons\n\n')
     scons_rules.append('env = Environment(CPPPATH=[\"%s\", \"%s\"])\n\n' % (GetFlameRootDir(), GetBuildRootDir()))
+
+    # Add c++ flags.
+    cpp_flags = ['-DNDEBUG', '-O2']
+    if cmd_parser.options.profile == 'debug':
+        cpp_flags = ['-g', '-DDEBUG']
+    scons_rules.append('env.Append(CPPFLAGS=%s)\n\n' % (cpp_flags))
+
     # Add builder for protobuf.
     scons_rules += ProtoBuilderRules()
 
+    targets = GetAllTargets()
     for target in targets:
         if target.type in target_types:
             scons_rules += target.scons_rules

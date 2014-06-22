@@ -88,6 +88,14 @@ def GetBuildRootDir():
     flame_root = GetFlameRootDir()
     return os.path.join(flame_root, GetBuildDirName())
 
+def GetBuildDebugRootDir():
+    flame_root = GetFlameRootDir()
+    return os.path.join(flame_root, 'FLAME_DEBUG')
+
+def GetBuildReleaseRootDir():
+    flame_root = GetFlameRootDir()
+    return os.path.join(flame_root, 'FLAME_RELEASE')
+
 def GetCpuCount():
     return multiprocessing.cpu_count()
 
