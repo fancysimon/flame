@@ -243,7 +243,9 @@ class CcTarget(Target):
             os.chdir(library_path)
             build_name = GetBuildName()
             if not os.path.isfile(build_name):
-                ErrorExit('BUILD not find.')
+                relative_dir = GetRelativeDir(library_path, GetFlameRootDir())
+                ErrorExit('//%s/BUILD not find. required by //%s:%s.' % (
+                        relative_dir, self.relative_dir, self.name))
             build_library_pool = target_pool.GetBuildLibraryPool()
             if (build_name, library_name) in build_library_pool:
                 os.chdir(current_dir)
