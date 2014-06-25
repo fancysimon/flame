@@ -19,6 +19,7 @@ def WriteRuleForAllTargets():
     GenerateRecursiveForSort()
     sorted_target_node_list = GetSortedTargetNodes(_target_pool)
     ComplementSubDeps(sorted_target_node_list)
+    SortDepLibraryForAllTargets()
     for node in sorted_target_node_list:
         target = _target_pool[node.key]
         target.WriteRule()
@@ -64,6 +65,11 @@ def ComplementSubDeps(sorted_target_node_list):
 def GenerateRecursiveForSort():
     global _target_pool
     for target in _target_pool.values():
+        target.recursive_library_list_for_sort = \
+                copy.copy(target.recursive_library_list)
+        continue
+        # TODO: remove below
+        '''
         if target.data.get('export_dynamic') != 1:
             target.recursive_library_list_for_sort = \
                     copy.copy(target.recursive_library_list)
@@ -76,6 +82,7 @@ def GenerateRecursiveForSort():
             if sub_target.data.get('prebuilt') == 1:
                 new_recursive_library_list.append(key)
         target.recursive_library_list_for_sort = new_recursive_library_list
+        '''
 
 def GetTargetPool():
     global _target_pool
@@ -85,4 +92,21 @@ def GetBuildLibraryPool():
     global _build_library_pool
     return _build_library_pool
 
-
+def SortDepLibraryForAllTargets():
+    # There will be wrong if dep library list in disorder.
+    global _target_pool
+    sorted_target_node_list = GetSortedTargetNodes(_target_pool)
+    dep_library_map = {}
+    flame_root_dir = GetFlameRootDir()
+    i = 0
+    for node in sorted_target_node_list:
+        relative_dir = GetRelativeDir(node.key, flame_root_dir)
+        dep_library = RemoveSpecialChar(relative_dir)
+        dep_library_map[dep_library] = i
+        dep_library_for_share = os.path.basename(node.key)
+        dep_library_map[dep_library_for_share] = i
+        i += 1
+    for target in _target_pool.values():
+        target.dep_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)
+        target.prebuilt_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)
+        target.prebuilt_static_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)

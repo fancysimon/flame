@@ -28,6 +28,8 @@ def ChooseDebugOrRelease():
     else:
         build_dir = GetBuildDebugRootDir()
     MkdirIfNotExists(build_dir)
+    print build_dir
+    print GetBuildRootDir()
     Symlink(build_dir, GetBuildRootDir())
 
 def Build():
@@ -228,12 +230,12 @@ def SelectJobs():
 
 def GetSconsRules(cmd):
     cmd_parser = GetCmdParser()
-    target_types = ['env', 'cc_library', 'cc_binary', 'proto_library']
+    target_types = ['env', 'cc_library', 'cc_binary', 'proto_library', 'cc_test']
     if cmd == 'install':
         target_types += ['extra_export']
-    elif cmd in ['test', 'clean']:
-        target_types += ['cc_test']
-    
+    #elif cmd in ['test', 'clean']:
+    #    target_types += ['cc_test']
+
     scons_rules = []
     scons_rules.append('import SCons\n\n')
     scons_rules.append('env = Environment(CPPPATH=[\"%s\", \"%s\"])\n\n' % (GetFlameRootDir(), GetBuildRootDir()))

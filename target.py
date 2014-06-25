@@ -30,7 +30,7 @@ class Target(object):
 
         self.key = os.path.join(self.current_dir, self.name)
         self.relative_name = os.path.join(self.relative_dir, self.name)
-        self.relative_name = self.RemoveSpecialChar(self.relative_name)
+        self.relative_name = RemoveSpecialChar(self.relative_name)
         self.target_name = self.relative_name
         self.full_name = os.path.join(self.build_root_dir,
             self.relative_dir, self.name)
@@ -54,7 +54,7 @@ class Target(object):
 
     def WriteRule(self):
         self.env = self.relative_name + self.dl_suffix + '_env'
-        self.env = self.RemoveSpecialChar(self.env)
+        self.env = RemoveSpecialChar(self.env)
         rule = '%s = env.Clone()' % (self.env)
         self.AddRule(rule)
         macros = []
@@ -71,16 +71,6 @@ class Target(object):
         if self.dep_header_list:
             rule = '%s.Append(CPPPATH=%s)' % (self.env, self.dep_header_list)
             self.AddRule(rule)
-
-    def RemoveSpecialChar(self, name):
-        magic_str = '_mAgIc_'
-        name = name.replace('/', magic_str)
-        name = name.replace('\\', magic_str)
-        name = name.replace('-', magic_str)
-        name = name.replace('.', magic_str)
-        name = name.replace(':', magic_str)
-        name = name.replace('+', magic_str)
-        return name
 
     def FormatDepLibrary(self):
         res = '['
@@ -151,7 +141,7 @@ class CcTarget(Target):
             self.AddRule(rule)
 
         objs_name = self.relative_dir + '_' + self.name + '_objs' + self.dl_suffix
-        objs_name = self.RemoveSpecialChar(objs_name)
+        objs_name = RemoveSpecialChar(objs_name)
         if self.data.get('export_dynamic') == 1 or self.data.get('export_static') == 1:
             rule = '%s = [%s]' % (objs_name, ','.join(self.objs + self.sub_objs))
         else:
@@ -189,7 +179,7 @@ class CcTarget(Target):
                     self.name + '.objs' + self.dl_suffix, src + '.o')
             self.obj_target_names.append(obj_target_name)
             obj = self.relative_dir + "_" + src + '_obj' + self.dl_suffix
-            obj = self.RemoveSpecialChar(obj)
+            obj = RemoveSpecialChar(obj)
             self.objs.append(obj)
 
     def ParseDeps(self):
@@ -203,7 +193,7 @@ class CcTarget(Target):
                 self.system_library_list.append(dep[1:])
             elif dep[0] == ':':
                 dep_library = os.path.join(self.relative_dir, dep[1:])
-                dep_library = self.RemoveSpecialChar(dep_library)
+                dep_library = RemoveSpecialChar(dep_library)
                 if self.data.get('export_dynamic') == 1:
                     self.dep_library_list.append(dep[1:])
                 else:
@@ -219,11 +209,12 @@ class CcTarget(Target):
                 library_path = fields[0]
                 library_path = library_path.rstrip('/')
                 library_name = fields[1]
-                dep_library = self.RemoveSpecialChar(library_path + ':' + library_name)
+                dep_library = RemoveSpecialChar(library_path + ':' + library_name)
                 if self.data.get('export_dynamic') == 1:
                     self.dep_library_list.append(library_name)
                 else:
                     self.dep_library_list.append(dep_library)
+
                 target_key = os.path.join(self.flame_root_dir,
                         library_path, library_name)
                 self.recursive_library_list.append(target_key)
@@ -303,7 +294,7 @@ class CcTestTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 defs, testdata):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type, [], defs)
-        self.testdata = testdata
+        self.testdata = VarToList(testdata)
         self.testcase_rundir = os.path.join(self.build_root_dir,
                 self.relative_dir, self.name + '.runfiles')
         self.testdata_copy_pair = []
@@ -422,7 +413,7 @@ class ProtoLibraryTarget(CcTarget):
             self.AddRule(rule)
 
         objs_name = self.relative_dir + '_' + self.name + '_objs'
-        objs_name = self.RemoveSpecialChar(objs_name)
+        objs_name = RemoveSpecialChar(objs_name)
         rule = '%s = [%s]' % (objs_name, ','.join(self.objs))
         self.AddRule(rule)
         deps = self.FormatDepLibrary()
@@ -453,7 +444,7 @@ class ProtoLibraryTarget(CcTarget):
                     self.name + '.objs', src + '.o')
             self.obj_target_names.append(obj_target_name)
             obj = self.relative_dir + "_" + src + '_obj'
-            obj = self.RemoveSpecialChar(obj)
+            obj = RemoveSpecialChar(obj)
             self.objs.append(obj)
 
 def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0):

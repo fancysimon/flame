@@ -66,6 +66,11 @@ def GetCurrentDir():
     return os.getcwd()
 
 def GetRelativeDir(dir1, dir2):
+    '''
+    dir1 = '/a/b/c/d'
+    dir2 = '/a/b'
+    result = c/d
+    '''
     return os.path.relpath(dir1, dir2)
 
 def GetFlameRootDir():
@@ -150,4 +155,14 @@ def ProtoBuilderRules():
     for builder in builder_list:
         scons_rules.append('env.Append(%s)\n\n' % builder)
     return scons_rules
+
+def RemoveSpecialChar(name):
+    magic_str = '_mAgIc_'
+    name = name.replace('/', magic_str)
+    name = name.replace('\\', magic_str)
+    name = name.replace('-', magic_str)
+    name = name.replace('.', magic_str)
+    name = name.replace(':', magic_str)
+    name = name.replace('+', magic_str)
+    return name
 
