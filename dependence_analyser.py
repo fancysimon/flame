@@ -34,8 +34,18 @@ def TopologySort(target_pool):
             break
         zero_degree_list = filter(lambda x:len(x.recursive_library_list)==0, target_node_list)
         target_node_list = filter(lambda x:len(x.recursive_library_list)>0, target_node_list)
+
         if len(zero_degree_list) == 0:
-            ErrorExit('Library dependency has circle!')
+            if CheckCircle(target_node_list):
+                ErrorExit('Library dependency has circle!')
+            target_key = target_node_list[0].key
+            not_find_library = target_node_list[0].recursive_library_list[0]
+            flame_dir = GetFlameRootDir()
+            relative_dir = GetRelativeDir(target_key, flame_dir)
+            target_name = '//%s:%s' % (relative_dir, os.path.basename(target_key))
+            relative_dir = GetRelativeDir(not_find_library, flame_dir)
+            not_find_library_name = '//%s:%s' % (relative_dir, os.path.basename(not_find_library))
+            ErrorExit('%s not find. required by %s' % (not_find_library_name, target_name))
         for node in zero_degree_list:
             for node2 in target_node_list:
                 if node.key in node2.recursive_library_list:
@@ -49,4 +59,18 @@ def GetSortedTargetNodes(target_pool):
         return _sorted_target_node_list
     _sorted_target_node_list = TopologySort(target_pool)
     return _sorted_target_node_list
+
+def CheckCircle(target_node_list):
+    node_dict = {}
+    for target_node in target_node_list:
+        for library in target_node.recursive_library_list:
+            key = (target_node.key, library)
+            if key in node_dict:
+                return True
+            node_dict[key] = 1
+            key = (library, target_node.key)
+            if key in node_dict:
+                return True
+            node_dict[key] = 1
+    return False
 
