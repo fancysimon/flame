@@ -54,8 +54,8 @@ flame_dir=$(cd $(dirname $flame_path) && pwd)
 flame_file="$flame_dir/flame.py"
 
 # Set your python here.
-#python_cmd=python
-python_cmd=python2.6
+python_cmd=python
+#python_cmd=python2.6
 
 # Check the python version at first, exit flame when python
 # version is under 2.6

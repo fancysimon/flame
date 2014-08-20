@@ -62,6 +62,7 @@ def GetSortedTargetNodes(target_pool):
 
 def CheckCircle(target_node_list):
     node_dict = {}
+    #print ToString(target_node_list)
     for target_node in target_node_list:
         for library in target_node.recursive_library_list:
             key = (target_node.key, library)

@@ -475,6 +475,8 @@ def extra_export(headers=[], confs=[], files=[]):
     target.RegisterTarget()
 
 def proto_library(name, srcs=[], deps=[]):
+    deps = VarToList(deps)
+    deps += ['//thirdparty/protobuf:protobuf',]
     target = ProtoLibraryTarget(name, 'proto_library', srcs, deps, 'Proto')
     target.RegisterTarget()
 
