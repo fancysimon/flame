@@ -28,8 +28,6 @@ def ChooseDebugOrRelease():
     else:
         build_dir = GetBuildDebugRootDir()
     MkdirIfNotExists(build_dir)
-    print build_dir
-    print GetBuildRootDir()
     Symlink(build_dir, GetBuildRootDir())
 
 def Build():
@@ -210,7 +208,8 @@ def RunScons(cmd):
             ErrorExit('There are some errors when install!')
 
     scons_file_name = GetSconsFileName(GetFlameRootDir())
-    os.remove(scons_file_name)
+    if not cmd_parser.options.generate_scons:
+        os.remove(scons_file_name)
     os.chdir(current_dir)
 
 def Check():

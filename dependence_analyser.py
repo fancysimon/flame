@@ -6,8 +6,9 @@
 Dependence analyser.
 '''
 
-import os
 import copy
+import os
+import sys
 from util import *
 
 _sorted_target_node_list = []
@@ -22,6 +23,26 @@ def ToString(target_node_list):
     for target_node in target_node_list:
         ans += '[key:' + target_node.key + ' lib:' + ','.join(target_node.recursive_library_list) + '] '
     return ans
+
+def OutputRequiredErrorAndExit(target_node_list):
+    target_key = target_node_list[0].key
+    target_key_dict = {}
+    for target in target_node_list:
+        target_key_dict[target.key] = 1
+    target_required_list = []
+    for target in target_node_list:
+        for required_library in target.recursive_library_list:
+            if required_library not in target_key_dict:
+                target_required_list.append([target.key, required_library])
+    for target_key, required_library in target_required_list:
+        flame_dir = GetFlameRootDir()
+        relative_dir = GetRelativeDir(target_key, flame_dir)
+        target_name = '//%s:%s' % (os.path.dirname(relative_dir), os.path.basename(target_key))
+        relative_dir = GetRelativeDir(required_library, flame_dir)
+
+        required_library_name = '//%s:%s' % (os.path.dirname(relative_dir), os.path.basename(required_library))
+        Error('%s not find. required by %s' % (required_library_name, target_name))
+    sys.exit(1)
 
 def TopologySort(target_pool):
     target_node_list = []
@@ -38,14 +59,7 @@ def TopologySort(target_pool):
         if len(zero_degree_list) == 0:
             if CheckCircle(target_node_list):
                 ErrorExit('Library dependency has circle!')
-            target_key = target_node_list[0].key
-            not_find_library = target_node_list[0].recursive_library_list[0]
-            flame_dir = GetFlameRootDir()
-            relative_dir = GetRelativeDir(target_key, flame_dir)
-            target_name = '//%s:%s' % (relative_dir, os.path.basename(target_key))
-            relative_dir = GetRelativeDir(not_find_library, flame_dir)
-            not_find_library_name = '//%s:%s' % (relative_dir, os.path.basename(not_find_library))
-            ErrorExit('%s not find. required by %s' % (not_find_library_name, target_name))
+            OutputRequiredErrorAndExit(target_node_list)
         for node in zero_degree_list:
             for node2 in target_node_list:
                 if node.key in node2.recursive_library_list:
@@ -62,6 +76,7 @@ def GetSortedTargetNodes(target_pool):
 
 def CheckCircle(target_node_list):
     node_dict = {}
+    #print ToString(target_node_list)
     for target_node in target_node_list:
         for library in target_node.recursive_library_list:
             key = (target_node.key, library)

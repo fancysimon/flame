@@ -73,6 +73,8 @@ class CmdParser(object):
                 default=0, help="Number of jobs to run simultaneously.")
         parser.add_argument("-p", "--profile", type=str, dest='profile',
                 default='release', help="Build profile: debug or release.")
+        parser.add_argument("--generate-scons", dest='generate_scons',
+                action="store_true", help="Generate scons file.")
 
     def AddRunArgs(self, parser):
         parser.add_argument("--args", type=str, dest='args',
