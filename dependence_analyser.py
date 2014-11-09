@@ -21,7 +21,7 @@ class TargetNode:
 def ToString(target_node_list):
     ans = ''
     for target_node in target_node_list:
-        ans += '[key:' + target_node.key + ' lib:' + ','.join(target_node.recursive_library_list) + '] '
+        ans += '[\n    key:' + target_node.key + '\n    lib:' + ',\n    '.join(target_node.recursive_library_list) + '\n]\n'
     return ans
 
 def OutputRequiredErrorAndExit(target_node_list):
@@ -39,7 +39,6 @@ def OutputRequiredErrorAndExit(target_node_list):
         relative_dir = GetRelativeDir(target_key, flame_dir)
         target_name = '//%s:%s' % (os.path.dirname(relative_dir), os.path.basename(target_key))
         relative_dir = GetRelativeDir(required_library, flame_dir)
-
         required_library_name = '//%s:%s' % (os.path.dirname(relative_dir), os.path.basename(required_library))
         Error('%s not find. required by %s' % (required_library_name, target_name))
     sys.exit(1)
@@ -63,8 +62,9 @@ def TopologySort(target_pool):
         for node in zero_degree_list:
             for node2 in target_node_list:
                 if node.key in node2.recursive_library_list:
-                    node2.recursive_library_list.remove(node.key)
+                    node2.recursive_library_list = filter(lambda x:x!=node.key, node2.recursive_library_list)
         result_list += zero_degree_list
+
     return result_list
 
 def GetSortedTargetNodes(target_pool):
