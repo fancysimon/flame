@@ -258,12 +258,14 @@ class CcTarget(Target):
 
 class CcLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs, export_dynamic, export_static, warning):
+                incs, defs, export_dynamic, export_static, warning,
+                link_all_symbols):
         CcTarget.__init__(self, name, target_type, srcs, deps,
                 scons_target_type, incs, defs)
         self.data['export_dynamic'] = export_dynamic
         self.data['export_static'] = export_static
         self.data['warning'] = warning
+        self.data['link_all_symbols'] = link_all_symbols
         if self.data.get('export_dynamic') == 1:
             self.dl_suffix = '_share'
             self.key += self.dl_suffix
@@ -447,7 +449,7 @@ class ProtoLibraryTarget(CcTarget):
             obj = RemoveSpecialChar(obj)
             self.objs.append(obj)
 
-def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0):
+def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0, link_all_symbols=0):
     if prebuilt == 1:
         target = CcPrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
         target.RegisterTarget()
@@ -455,9 +457,9 @@ def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='ye
         target.RegisterTarget()
         return
     if export_dynamic == 1:
-        target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
+        target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning, 0)
         target.RegisterTarget()
-    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning)
+    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning, link_all_symbols)
     target.RegisterTarget()
 
 def cc_binary(name, srcs, deps=[], defs=[]):
