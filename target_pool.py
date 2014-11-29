@@ -20,6 +20,7 @@ def WriteRuleForAllTargets():
     sorted_target_node_list = GetSortedTargetNodes(_target_pool)
     ComplementSubDeps(sorted_target_node_list)
     SortDepLibraryForAllTargets()
+    GenerateLinkAllSymbolsList()
     for node in sorted_target_node_list:
         target = _target_pool[node.key]
         target.WriteRule()
@@ -37,9 +38,12 @@ def ComplementSubDeps(sorted_target_node_list):
     global _target_pool
     for node in sorted_target_node_list:
         target = _target_pool[node.key]
+        # First copy recursive_library_list to sub.
+        target.recursive_library_list_with_sub = copy.copy(target.recursive_library_list)
         if target.type == 'extra_export':
             continue
         recursive_library_list_str = ''
+        sub_recursive_library_list = []
         for key in target.recursive_library_list:
             sub_target = _target_pool[key]
             # Dependant sub library must be put after this library,
@@ -53,6 +57,9 @@ def ComplementSubDeps(sorted_target_node_list):
                 target.prebuilt_library_list.append(sub_target.name)
                 target.prebuilt_static_library_list.append(sub_target.target_name)
             recursive_library_list_str += sub_target.name + ','
+            sub_recursive_library_list += sub_target.recursive_library_list_with_sub
+        target.recursive_library_list_with_sub = target.recursive_library_list_with_sub + sub_recursive_library_list
+        target.recursive_library_list_with_sub = RemoveDuplicate(target.recursive_library_list_with_sub)
         target.dep_header_list = RemoveDuplicate(target.dep_header_list)
         target.dep_library_list = RemoveDuplicate(target.dep_library_list)
         target.system_library_list = RemoveDuplicate(target.system_library_list)
@@ -67,22 +74,6 @@ def GenerateRecursiveForSort():
     for target in _target_pool.values():
         target.recursive_library_list_for_sort = \
                 copy.copy(target.recursive_library_list)
-        continue
-        # TODO: remove below
-        '''
-        if target.data.get('export_dynamic') != 1:
-            target.recursive_library_list_for_sort = \
-                    copy.copy(target.recursive_library_list)
-            continue
-        new_recursive_library_list = []
-        for key in target.recursive_library_list:
-            if key not in _target_pool:
-                continue
-            sub_target = _target_pool[key]
-            if sub_target.data.get('prebuilt') == 1:
-                new_recursive_library_list.append(key)
-        target.recursive_library_list_for_sort = new_recursive_library_list
-        '''
 
 def GetTargetPool():
     global _target_pool
@@ -110,3 +101,25 @@ def SortDepLibraryForAllTargets():
         target.dep_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)
         target.prebuilt_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)
         target.prebuilt_static_library_list.sort(key=lambda x:dep_library_map[x], reverse=True)
+
+# Generate link all symbols by dep library list.
+def GenerateLinkAllSymbolsList():
+    global _target_pool
+    flame_root_dir = GetFlameRootDir()
+    for target_key in _target_pool:
+        target = _target_pool[target_key]
+        # Only binary and test need link all symbols.
+        if target.type != 'cc_binary' and target.type != 'cc_test':
+            continue
+
+        link_all_symbols_list = []
+        for sub_target_key in target.recursive_library_list_with_sub:
+            relative_dir = GetRelativeDir(sub_target_key, flame_root_dir)
+            dep_library = RemoveSpecialChar(relative_dir)
+            sub_target = _target_pool[sub_target_key]
+            if sub_target.data.get('link_all_symbols') == 1:
+                link_all_symbols_list.append(dep_library)
+        not_link_all_symbols_list = [i for i in target.dep_library_list if i not in link_all_symbols_list]
+        target.dep_library_list = not_link_all_symbols_list
+        target.link_all_symbols_lib_list = link_all_symbols_list
+

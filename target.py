@@ -40,10 +40,13 @@ class Target(object):
         self.prebuilt_library_list = []
         self.prebuilt_static_library_list = []
         self.dep_library_list = []
+        self.link_all_symbols_lib_list = []
         self.dep_paths = []
         self.dep_header_list = []
-        self.recursive_library_list = []
+        self.recursive_library_list = []  # Save dep library's target keys.
         self.recursive_library_list_sort = []
+        # Save dep library's target keys and dep sub target keys.
+        self.recursive_library_list_with_sub = []
         self.scons_rules = []
         self.scons_rules_for_install = []
         self.objs = []
@@ -70,6 +73,11 @@ class Target(object):
         # Include path.
         if self.dep_header_list:
             rule = '%s.Append(CPPPATH=%s)' % (self.env, self.dep_header_list)
+            self.AddRule(rule)
+        # Link all symbols.
+        if self.link_all_symbols_lib_list:
+            link_all_symbols_str = ','.join(self.link_all_symbols_lib_list)
+            rule = '%s.Append(LINKFLAGS=["-Wl,--whole-archive", %s , "-Wl,--no-whole-archive"])' % (self.env, link_all_symbols_str)
             self.AddRule(rule)
 
     def FormatDepLibrary(self):
