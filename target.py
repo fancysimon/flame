@@ -167,6 +167,15 @@ class CcTarget(Target):
                     self.full_name, objs_name, deps)
         self.AddRule(rule)
 
+        # Depend relation.
+        if self.link_all_symbols_lib_list:
+            if self.type == 'cc_binary' or \
+                    self.data.get('export_dynamic') == 1 or \
+                    self.data.get('export_static') == 1:
+                link_all_symbols_str = '[' + ','.join(self.link_all_symbols_lib_list) + ']'
+                rule = '%s.Depends(%s, %s)' % (self.env, self.target_name, link_all_symbols_str)
+                self.AddRule(rule)
+
     def ParseAndAddTarget(self):
         self.AddObjs()
         self.ParseDeps()
