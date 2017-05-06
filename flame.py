@@ -16,10 +16,11 @@ from cmd_parser import *
 
 def Main():
     cmd_parser = GetCmdParser()
+    Check()
     ChooseDebugOrRelease()
     cmd_dict = {'build':Build, 'test':Test, 'run':Run, 'clean':Clean, 'install':Install}
     cmd = cmd_dict[cmd_parser.options.command]
-    cmd()
+    return cmd()
 
 def ChooseDebugOrRelease():
     cmd_parser = GetCmdParser()
@@ -35,30 +36,33 @@ def Build():
     GenerateSconsRules('build')
     RunScons('build')
     Info('Build success!')
+    return 0
 
 def Test():
     LoadBuildFiles()
     GenerateSconsRules('test')
     RunScons('test')
-    RunTestCases()
+    return RunTestCases()
 
 def Run():
     LoadBuildFiles()
     GenerateSconsRules('run')
     RunScons('run')
-    RunBinary()
+    return RunBinary()
 
 def Clean():
     LoadBuildFiles()
     GenerateSconsRules('clean')
     RunScons('clean')
     Info('Clean success!')
+    return 0
 
 def Install():
     LoadBuildFiles()
     GenerateSconsRules('install')
     RunScons('install')
     Info('Install success!')
+    return 0
 
 def RunTestCases():
     cmd_parser = GetCmdParser()
@@ -85,9 +89,11 @@ def RunTestCases():
     os.chdir(current_dir)
     if test_case_num == success_test_case_num:
         Info('All test cases passed!')
+        return 0
     else:
         Info('%d test cases passed!' % success_test_case_num)
         Error('%d test cases failed!' % (test_case_num - success_test_case_num))
+        return test_case_num - success_test_case_num
 
 def RunBinary():
     cmd_parser = GetCmdParser()
@@ -117,6 +123,7 @@ def RunBinary():
             else:
                 Error("Run %s failed. The return code is %d." % (fields[1], ret))
             os.chdir(current_dir)
+            return ret
     else:
         ErrorExit('Target format is invalid.')
 
@@ -139,6 +146,10 @@ def LoadBuildFile(target=None):
 def LoadBuildFiles():
     Check()
     cmd_parser = GetCmdParser()
+    # Change reletive path to abspath
+    if cmd_parser.options.command in ['install', 'clean'] :
+        abs_prefix = os.path.abspath(cmd_parser.options.prefix)
+        cmd_parser.options.prefix = abs_prefix
     Info('Loading BUILDs...')
     if len(cmd_parser.targets) == 0:
         LoadBuildFile()
@@ -211,6 +222,7 @@ def RunScons(cmd):
     if not cmd_parser.options.generate_scons:
         os.remove(scons_file_name)
     os.chdir(current_dir)
+    return 0
 
 def Check():
     if GetFlameRootDir() == '':
@@ -245,6 +257,14 @@ def GetSconsRules(cmd):
         cpp_flags = ['-g', '-DDEBUG']
     scons_rules.append('env.Append(CPPFLAGS=%s)\n\n' % (cpp_flags))
 
+    # Add project flags.
+    flame_root = os.path.join(GetFlameRootDir(), 'FLAME_ROOT')
+    execfile(flame_root)
+    if 'include_paths' in locals():
+        scons_rules.append('env.Append(CPPPATH=%s)\n\n' % VarToList(locals()['include_paths']))
+    if 'lib_paths' in locals():
+        scons_rules.append('env.Append(LIBPATH=%s)\n\n' % VarToList(locals()['lib_paths']))
+
     # Add builder for protobuf.
     scons_rules += ProtoBuilderRules()
 
@@ -266,4 +286,5 @@ def NeedInstall():
     return len(scons_rules) > 0
 
 if __name__ == '__main__':
-    Main()
+    ret = Main()
+    sys.exit(ret)

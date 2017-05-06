@@ -83,4 +83,4 @@ if [[ ! -f "$flame_file" ]]; then
 fi
 
 ${python_cmd} $flame_file "$@"
-
+exit $?

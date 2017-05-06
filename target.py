@@ -12,7 +12,8 @@ import target_pool
 class Target(object):
     '''Base class of Target.
     '''
-    def __init__(self, name, target_type, srcs, deps, scons_target_type, incs, defs):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type,
+            incs, defs, extra_include_paths, extra_lib_paths):
         self.name = name
         self.type = target_type
         self.incs = VarToList(incs)
@@ -53,6 +54,9 @@ class Target(object):
         self.sub_objs = []
         self.data = {}
 
+        self.extra_include_paths = VarToList(extra_include_paths)
+        self.extra_lib_paths = VarToList(extra_lib_paths)
+
         self.release_prefix = ParseReleasePrefix(sys.argv)
 
     def WriteRule(self):
@@ -74,10 +78,26 @@ class Target(object):
         if self.dep_header_list:
             rule = '%s.Append(CPPPATH=%s)' % (self.env, self.dep_header_list)
             self.AddRule(rule)
+        # Extra include path.
+        if self.extra_include_paths:
+            rule = '%s.Append(CPPPATH=%s)' % (self.env, self.extra_include_paths)
+            self.AddRule(rule)
+
+        # Extra lib path.
+        if self.extra_lib_paths:
+            rule = '%s.Append(LIBPATH=%s)' % (self.env, self.extra_lib_paths)
+            self.AddRule(rule)
+
         # Link all symbols.
         if self.link_all_symbols_lib_list:
             link_all_symbols_str = ','.join(self.link_all_symbols_lib_list)
-            rule = '%s.Append(LINKFLAGS=["-Wl,--whole-archive", %s , "-Wl,--no-whole-archive"])' % (self.env, link_all_symbols_str)
+            whole_archive = "-Wl,--whole-archive"
+            no_whole_archive = "-Wl,--no-whole-archive"
+            if Platform() == "darwin":
+                whole_archive = "-Wl,-all_load"
+                no_whole_archive = "-Wl,-noall_load"
+            rule = '%s.Append(LINKFLAGS=["%s", %s , "%s"])' % (
+                    self.env, whole_archive, link_all_symbols_str, no_whole_archive)
             self.AddRule(rule)
 
     def FormatDepLibrary(self):
@@ -135,8 +155,10 @@ class Target(object):
         pass
 
 class CcTarget(Target):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type, incs, defs):
-        Target.__init__(self, name, target_type, srcs, deps, scons_target_type, incs, defs)
+    def __init__(self, name, target_type, srcs, deps, scons_target_type,
+            incs, defs, extra_include_paths, extra_lib_paths):
+        Target.__init__(self, name, target_type, srcs, deps, scons_target_type,
+                incs, defs, extra_include_paths, extra_lib_paths)
 
     def WriteRule(self):
         Target.WriteRule(self)
@@ -275,14 +297,17 @@ class CcTarget(Target):
 
 class CcLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs, export_dynamic, export_static, warning,
-                link_all_symbols):
+            incs, defs, extra_include_paths, extra_lib_paths,
+            export_dynamic, export_static, warning,
+            link_all_symbols, allow_export):
         CcTarget.__init__(self, name, target_type, srcs, deps,
-                scons_target_type, incs, defs)
+                scons_target_type, incs, defs, extra_include_paths,
+                extra_lib_paths)
         self.data['export_dynamic'] = export_dynamic
         self.data['export_static'] = export_static
         self.data['warning'] = warning
         self.data['link_all_symbols'] = link_all_symbols
+        self.data['allow_export'] = allow_export
         if self.data.get('export_dynamic') == 1:
             self.dl_suffix = '_share'
             self.key += self.dl_suffix
@@ -297,9 +322,10 @@ class CcLibraryTarget(CcTarget):
             self.AddRuleForInstall(rule)
 
 class CcBinaryTarget(CcTarget):
-    def __init__(self, name, target_type, srcs, deps, scons_target_type, defs):
+    def __init__(self, name, target_type, srcs, deps, scons_target_type, defs,
+            extra_include_paths, extra_lib_paths):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                [], defs)
+                [], defs, extra_include_paths, extra_lib_paths)
 
     def WriteRule(self):
         CcTarget.WriteRule(self)
@@ -312,7 +338,8 @@ class CcBinaryTarget(CcTarget):
 class CcTestTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 defs, testdata):
-        CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type, [], defs)
+        CcTarget.__init__(self, name, target_type, srcs, deps,
+                scons_target_type, [], defs, [], [])
         self.testdata = VarToList(testdata)
         self.testcase_rundir = os.path.join(self.build_root_dir,
                 self.relative_dir, self.name + '.runfiles')
@@ -346,7 +373,7 @@ class CcPrebuiltLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type,
                 incs, defs, export_dynamic, export_static, warning):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                incs, defs)
+                incs, defs, [], [])
         self.data['export_dynamic'] = export_dynamic
         self.data['export_static'] = export_static
         self.data['warning'] = warning
@@ -379,7 +406,8 @@ class CcPrebuiltLibraryTarget(CcTarget):
 
 class ExtraExportTarget(Target):
     def __init__(self, headers, confs, files):
-        Target.__init__(self, 'extra_export', 'extra_export', [], [], '', [], [])
+        Target.__init__(self, 'extra_export', 'extra_export',
+                [], [], '', [], [], [], [])
         self.export_headers = VarToList(headers)
         self.export_confs = VarToList(confs)
         self.export_files = VarToList(files)
@@ -413,7 +441,7 @@ class ExtraExportTarget(Target):
 class ProtoLibraryTarget(CcTarget):
     def __init__(self, name, target_type, srcs, deps, scons_target_type):
         CcTarget.__init__(self, name, target_type, srcs, deps, scons_target_type,
-                [], [])
+                [], [], [], [])
 
     def WriteRule(self):
         Target.WriteRule(self)
@@ -466,7 +494,9 @@ class ProtoLibraryTarget(CcTarget):
             obj = RemoveSpecialChar(obj)
             self.objs.append(obj)
 
-def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='yes', export_dynamic=0, export_static=0, link_all_symbols=0):
+def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[],
+        extra_include_paths=[], extra_lib_paths=[], warning='yes',
+        export_dynamic=0, export_static=0, link_all_symbols=0, allow_export=1):
     if prebuilt == 1:
         target = CcPrebuiltLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning)
         target.RegisterTarget()
@@ -474,13 +504,19 @@ def cc_library(name, srcs=[], deps=[], prebuilt=0, incs=[], defs=[], warning='ye
         target.RegisterTarget()
         return
     if export_dynamic == 1:
-        target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'SharedLibrary', incs, defs, 1, 0, warning, 0)
+        target = CcLibraryTarget(name, 'cc_library', srcs, deps,
+                'SharedLibrary', incs, defs, extra_include_paths,
+                extra_lib_paths, 1, 0, warning, 0, allow_export)
         target.RegisterTarget()
-    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library', incs, defs, 0, export_static, warning, link_all_symbols)
+    target = CcLibraryTarget(name, 'cc_library', srcs, deps, 'Library',
+            incs, defs, extra_include_paths, extra_lib_paths, 0,
+            export_static, warning, link_all_symbols, allow_export)
     target.RegisterTarget()
 
-def cc_binary(name, srcs, deps=[], defs=[]):
-    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', defs)
+def cc_binary(name, srcs, deps=[], defs=[], extra_include_paths=[],
+        extra_lib_paths=[]):
+    target = CcBinaryTarget(name, 'cc_binary', srcs, deps, 'Program', defs,
+            extra_include_paths, extra_lib_paths)
     target.RegisterTarget()
 
 def cc_test(name, srcs, deps=[], defs=[], testdata=[]):

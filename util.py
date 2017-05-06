@@ -166,3 +166,6 @@ def RemoveSpecialChar(name):
     name = name.replace('+', magic_str)
     return name
 
+def Platform():
+    return sys.platform
+

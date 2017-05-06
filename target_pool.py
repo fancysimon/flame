@@ -52,7 +52,10 @@ def ComplementSubDeps(sorted_target_node_list):
             target.system_library_list += sub_target.system_library_list
             target.dep_paths += sub_target.dep_paths
             target.dep_header_list += sub_target.dep_header_list
-            target.sub_objs += sub_target.sub_objs + sub_target.objs
+            # If the library not allow export, export static or dynamic
+            # will not archive the objs.
+            if not sub_target.data.has_key('allow_export') or sub_target.data.get('allow_export') == 1:
+                target.sub_objs += sub_target.sub_objs + sub_target.objs
             if sub_target.data.get('prebuilt') == 1:
                 target.prebuilt_library_list.append(sub_target.name)
                 target.prebuilt_static_library_list.append(sub_target.target_name)
